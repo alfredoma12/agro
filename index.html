@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Pro</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.25), transparent 28%),
+              radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.18), transparent 22%),
+              linear-gradient(180deg, #090b16 0%, #111827 100%);
+  color: #e2e8f0;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.app-header {
+  max-width: 1120px;
+  margin: 0 auto 25px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.brand-title {
+  display: block;
+  color: #f8fafc;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.brand-copy {
+  color: #cbd5e1;
+  font-size: 15px;
+  margin-top: 8px;
+  max-width: 620px;
+}
+
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.18);
+  color: #bfdbfe;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.container {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.card {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 24px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
+  overflow: hidden;
+}
+
+.auth-header {
+  display: flex;
+  gap: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 18px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  transition: all 0.25s ease;
+  color: #94a3b8;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-btn.active {
+  color: #eef2ff;
+  border-bottom-color: #7c3aed;
+}
+
+.tab-btn:hover {
+  color: #f8fafc;
+}
+
+.form-content {
+  padding: 32px;
+  display: none;
+}
+
+.form-content.active {
+  display: block;
+}
+
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: #e2e8f0;
+  font-size: 14px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 14px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f8fafc;
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #7c3aed;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.form-group input.error {
+  border-color: #fb7185;
+  background: rgba(251, 113, 133, 0.08);
+}
+
+.error-msg {
+  color: #fda4af;
+  font-size: 13px;
+  margin-top: 8px;
+  display: none;
+}
+
+.error-msg.show {
+  display: block;
+}
+
+.success-box {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #a7f3d0;
+  padding: 16px;
+  border-radius: 14px;
+  font-size: 14px;
+  margin-bottom: 18px;
+  display: none;
+}
+
+.success-box.show {
+  display: block;
+}
+
+.btn {
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px rgba(99, 102, 241, 0.18);
+}
+
+.btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: rgba(148, 163, 184, 0.15);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  min-width: 180px;
+}
+
+.btn-secondary:hover {
+  background: rgba(148, 163, 184, 0.22);
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+#dash {
+  display: none;
+  animation: slideUp 0.5s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dash-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 32px;
+  background: linear-gradient(135deg, rgba(59,130,246,0.16), rgba(124,58,237,0.15));
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.dash-title {
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.status-online {
+  background: #16a34a;
+  color: #f8fafc;
+}
+
+.status-offline {
+  background: #dc2626;
+  color: #f8fafc;
+}
+
+.dash-content {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dash-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 18px;
+}
+
+.metric-card {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 20px;
+  padding: 22px;
+}
+
+.metric-title {
+  color: #94a3b8;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 10px;
+}
+
+.metric-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.status-meta {
+  color: #c7d2fe;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.readings-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+#grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 18px;
+}
+
+.reading-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 20px;
+  padding: 20px;
+  text-align: left;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.reading-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.22);
+}
+
+.reading-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+
+.reading-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #e2e8f0;
+}
+
+.chart-card {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 24px;
+  padding: 20px;
+}
+
+.chart-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #f8fafc;
+}
+
+#trend-chart {
+  width: 100%;
+  height: 260px !important;
+  max-height: 260px;
+}
+
+#trend-chart {
+  display: block;
+}
+
+.dash-header-right {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.btn-logout:hover {
+  background: #dc2626;
+  box-shadow: 0 16px 32px rgba(239, 68, 68, 0.2);
+}
+
+@media (max-width: 900px) {
+  .dash-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dash-actions {
+    flex-direction: column;
+    justify-content: stretch;
+    align-items: stretch;
+  }
+
+  .dash-summary {
+    grid-template-columns: 1fr;
+  }
+
+  #grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .chart-card {
+    padding: 18px;
+  }
+
+  .reading-card {
+    padding: 18px;
+  }
+}
+
+</style>
+</head>
+<body>
+<div class="app-header">
+  <div>
+    <span class="brand-title">Dashboard Pro</span>
+    <p class="brand-copy">Monitoreo de dispositivo IoT con diseño profesional. Datos limpios, estado claro y tendencias en tiempo real para entornos de producción.</p>
+  </div>
+  <span class="brand-badge">Producción · Tiempo real</span>
+</div>
+
+<div class="container">
+  <div id="auth" class="card">
+    <div class="auth-header">
+      <button class="tab-btn active" onclick="showTab(event, 'login')">Login</button>
+      <button class="tab-btn" onclick="showTab(event, 'register')">Registro</button>
+      <button class="tab-btn" onclick="showTab(event, 'admin-panel')">Admin</button>
+    </div>
+
+    <form id="login" class="form-content active" onsubmit="doLogin(event)">
+      <div class="form-group">
+        <label for="login-user">Usuario</label>
+        <input id="login-user" type="text" placeholder="Ingresa tu usuario" required>
+        <div class="error-msg"></div>
+      </div>
+      <div class="form-group">
+        <label for="login-pass">Contraseña</label>
+        <input id="login-pass" type="password" placeholder="Ingresa tu contraseña" required>
+        <div class="error-msg"></div>
+      </div>
+      <button type="submit" class="btn btn-primary" id="login-btn">Entrar</button>
+    </form>
+
+    <form id="register" class="form-content" onsubmit="doRegister(event)">
+      <div class="form-group">
+        <label for="reg-user">Usuario</label>
+        <input id="reg-user" type="text" placeholder="Elige un usuario" required>
+        <div class="error-msg"></div>
+      </div>
+      <div class="form-group">
+        <label for="reg-pass">Contraseña</label>
+        <input id="reg-pass" type="password" placeholder="Crea una contraseña" required>
+        <div class="error-msg"></div>
+      </div>
+      <div class="form-group">
+        <label for="reg-device">ID Dispositivo</label>
+        <input id="reg-device" type="text" placeholder="ID del dispositivo (ej: ESP32_PLANTA_TALLER)" required>
+        <div class="error-msg"></div>
+      </div>
+      <div class="form-group">
+        <label for="reg-token">Token de Autenticación</label>
+        <input id="reg-token" type="text" placeholder="Token de la etiqueta" required>
+        <div class="error-msg"></div>
+      </div>
+      <button type="submit" class="btn btn-primary" id="reg-btn">Crear Cuenta</button>
+    </form>
+
+    <form id="admin-panel" class="form-content" onsubmit="doAdminRegisterDevice(event)">
+      <div class="form-group">
+        <label for="admin-master-key">Clave Maestra de Admin</label>
+        <input id="admin-master-key" type="password" placeholder="Clave maestra de administración" required>
+        <div class="error-msg"></div>
+      </div>
+      <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+      <div style="font-size: 13px; color:#666; margin-bottom: 12px; font-weight: bold;">PRE-REGISTRAR EQUIPO NUEVO</div>
+      
+      <div id="admin-success" class="success-box"></div>
+
+      <div class="form-group">
+        <label for="admin-device-id">ID Nuevo Dispositivo</label>
+        <input id="admin-device-id" type="text" placeholder="Ej: ESP32_PLANTA_TALLER">
+        <div class="error-msg"></div>
+      </div>
+      <div class="form-group">
+        <label for="admin-device-token">Token de Activación a Asignar</label>
+        <input id="admin-device-token" type="text" placeholder="Ej: 123456 o genera uno seguro">
+        <div class="error-msg"></div>
+      </div>
+      <button type="submit" class="btn btn-primary" id="admin-btn">Alta de Dispositivo</button>
+    </form>
+  </div>
+
+  <div id="dash" class="card">
+    <div class="dash-header">
+      <div>
+        <span class="dash-title" id="device">Dashboard</span>
+        <div class="status-meta" id="status-meta">Esperando datos...</div>
+      </div>
+      <div class="dash-header-right">
+        <span class="status-badge status-offline" id="status">DESCONOCIDO</span>
+        <button class="btn btn-logout" type="button" onclick="logout()">Cerrar sesión</button>
+      </div>
+    </div>
+    <div class="dash-content">
+      <div class="dash-actions">
+        <div class="dash-summary">
+          <div class="metric-card">
+            <div class="metric-title">Última actualización</div>
+            <div class="metric-value" id="last-update">--</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-title">Variables en el gráfico</div>
+            <div class="metric-value">Temperatura · Humedad aire · Humedad tierra</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-title">Estado del sensor</div>
+            <div class="metric-value" id="sensor-status">--</div>
+          </div>
+        </div>
+      </div>
+      <div class="readings-title">Lecturas del Dispositivo</div>
+      <div id="grid"></div>
+      <div class="chart-card">
+        <div class="chart-title">Tendencia de datos</div>
+        <canvas id="trend-chart"></canvas>
+      </div>
+      <div class="dash-actions">
+        <button class="btn btn-secondary" type="button" onclick="load()">Actualizar ahora</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
