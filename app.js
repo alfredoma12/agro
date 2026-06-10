@@ -5,6 +5,7 @@ let device = localStorage.getItem("device");
 let loadInterval = null;
 let trendChart = null;
 let trendHistory = { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
+let trendHistoryRaw = []; // raw DB rows (one entry per lectura)
 const HISTORY_STORAGE_KEY = 'dashboard-history';
 const AUTO_REFRESH_INTERVAL_MS = 30000; // 30 segundos para reflejar cambios del sensor rápidamente
 
@@ -81,6 +82,14 @@ function normalizeVariableName(variable) {
   return null;
 }
 
+function variableEmoji(variable) {
+  const key = normalizeVariableName(variable) || (String(variable || '').toLowerCase());
+  if (/temp|temperatura|°c|celsius/.test(key)) return '☀️';
+  if (/humedad_aire|aire|ambiente|ambient|humidity.*air/.test(key)) return '☁️';
+  if (/humedad_tierra|tierra|suelo|sustrato|soil/.test(key)) return '🌱';
+  return '';
+}
+
 function parseSensorTimestamp(data) {
   if (!data || typeof data !== 'object') return null;
 
@@ -118,7 +127,8 @@ function loadChartHistory() {
       timestamps: Array.isArray(parsed.timestamps) ? parsed.timestamps : [],
       temperatura: Array.isArray(parsed.temperatura) ? parsed.temperatura : [],
       humedad_aire: Array.isArray(parsed.humedad_aire) ? parsed.humedad_aire : [],
-      humedad_tierra: Array.isArray(parsed.humedad_tierra) ? parsed.humedad_tierra : []
+      humedad_tierra: Array.isArray(parsed.humedad_tierra) ? parsed.humedad_tierra : [],
+      rawLecturas: Array.isArray(parsed.rawLecturas) ? parsed.rawLecturas : []
     };
   } catch {
     return { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
@@ -126,7 +136,8 @@ function loadChartHistory() {
 }
 
 function saveChartHistory() {
-  localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(trendHistory));
+  const toStore = Object.assign({}, trendHistory, { rawLecturas: Array.isArray(trendHistoryRaw) ? trendHistoryRaw : [] });
+  localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(toStore));
 }
 
 function parseTelemetryHistory(payload) {
@@ -212,18 +223,70 @@ function parseTelemetryHistory(payload) {
 }
 
 function initializeChartFromStorage() {
-  trendHistory = loadChartHistory();
-  if (!trendHistory.timestamps.length) return false;
-
-  if (!trendChart) {
-    createTrendChart();
-  }
-  updateTrendChartData();
+  const stored = loadChartHistory();
+  trendHistory = stored;
+  trendHistoryRaw = Array.isArray(stored.rawLecturas) ? stored.rawLecturas : [];
+  if (!trendHistory.timestamps.length && !trendHistoryRaw.length) return false;
+  renderHistoryTable();
   return true;
 }
 
 async function loadHistoricalData() {
   if (!token || !device) return false;
+
+  // Try to fetch full DB lecturas via paginated endpoint first
+  async function fetchAllLecturas() {
+    const all = [];
+    const pageSize = 1000;
+    let offset = 0;
+    try {
+      while (true) {
+        const url = `${API_URL}/api/lecturas?dispositivo=${encodeURIComponent(device)}&limit=${pageSize}&offset=${offset}`;
+        const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+        if (!resp.ok) {
+          // try fallback without query params
+          const resp2 = await fetch(`${API_URL}/api/lecturas`, { headers: { Authorization: 'Bearer ' + token } });
+          if (!resp2.ok) return null;
+          const body2 = await resp2.json();
+          if (Array.isArray(body2)) return body2;
+          if (Array.isArray(body2.lecturas)) return body2.lecturas;
+          return null;
+        }
+
+        const body = await resp.json();
+        let pageRows = [];
+        if (Array.isArray(body)) pageRows = body;
+        else if (Array.isArray(body.lecturas)) pageRows = body.lecturas;
+        else if (Array.isArray(body.rows)) pageRows = body.rows;
+        else break;
+
+        if (!pageRows.length) break;
+        all.push(...pageRows.filter(r => !r.dispositivo_id || r.dispositivo_id === device));
+
+        if (pageRows.length < pageSize) break;
+        offset += pageSize;
+      }
+      return all.length ? all : null;
+    } catch (e) {
+      console.warn('Error fetching /api/lecturas paginated', e);
+      return null;
+    }
+  }
+
+  // First, try the dedicated lecturas endpoint (paginated). If it returns rows, use it.
+  let payload = null;
+  let foundPath = null;
+
+  try {
+    const lecturasAll = await fetchAllLecturas();
+    if (Array.isArray(lecturasAll) && lecturasAll.length) {
+      payload = { lecturas: lecturasAll };
+      foundPath = '/api/lecturas';
+      console.info('Historial recibido desde /api/lecturas (paginated)');
+    }
+  } catch (e) {
+    console.warn('Error intentando /api/lecturas:', e);
+  }
 
   const paths = [
     `/api/dispositivo/${device}/actual`,
@@ -238,32 +301,39 @@ async function loadHistoricalData() {
     `/api/dispositivo/${device}/measurements`,
     `/api/dispositivo/${device}/registro`,
     `/api/dispositivo/${device}/records`,
+    `/api/lecturas?dispositivo=${device}`,
+    `/api/telemetria?dispositivo=${device}`,
+    `/api/historial?dispositivo=${device}`,
+    `/api/records?dispositivo=${device}`,
+    `/api/dispositivo?dispositivo=${device}`,
     `/api/dispositivo/${device}`
   ];
 
-  let payload = null;
-  for (const path of paths) {
-    try {
-      const response = await fetch(API_URL + path, {
-        headers: { Authorization: 'Bearer ' + token }
-      });
+  if (!payload) {
+    for (const path of paths) {
+      try {
+        const response = await fetch(API_URL + path, {
+          headers: { Authorization: 'Bearer ' + token }
+        });
 
-      if (response.status === 401) {
-        logout();
-        return false;
-      }
+        if (response.status === 401) {
+          logout();
+          return false;
+        }
 
-      if (!response.ok) {
-        console.warn('No se encontró historial en', path, '(', response.status, response.statusText, ')');
+        if (!response.ok) {
+          console.warn('No se encontró historial en', path, '(', response.status, response.statusText, ')');
+          continue;
+        }
+
+        payload = await response.json();
+        foundPath = path;
+        console.info('Historial recibido desde', path);
+        if (payload) break;
+      } catch (error) {
+        console.warn('No se pudo obtener historial desde', path, error);
         continue;
       }
-
-      payload = await response.json();
-      console.info('Historial recibido desde', path, payload);
-      if (payload) break;
-    } catch (error) {
-      console.warn('No se pudo obtener historial desde', path, error);
-      continue;
     }
   }
 
@@ -272,17 +342,68 @@ async function loadHistoricalData() {
     return false;
   }
 
-  const parsedHistory = parseTelemetryHistory(payload);
+  // Normalize payload into a { lecturas: [...] } shape and filter by dispositivo
+  let normalized = { lecturas: [] };
+
+  if (Array.isArray(payload)) {
+    // If payload is directly an array of lecturas (DB collection), filter by dispositivo if present
+    if (payload.length && payload[0] && (payload[0].variable || payload[0].valor || payload[0].fecha || payload[0].date)) {
+      normalized.lecturas = payload.filter(item => !item.dispositivo_id || item.dispositivo_id === device);
+    } else if (payload.length && payload[0] && payload[0].dispositivo_id) {
+      // array of device objects: collect nested lecturas
+      normalized.lecturas = payload
+        .filter(p => p.dispositivo_id === device)
+        .flatMap(p => Array.isArray(p.lecturas) ? p.lecturas : []);
+    } else {
+      normalized.lecturas = payload;
+    }
+  } else if (payload && typeof payload === 'object') {
+    if (Array.isArray(payload.lecturas)) {
+      normalized.lecturas = payload.lecturas.filter(item => !item.dispositivo_id || item.dispositivo_id === device);
+    } else if (Array.isArray(payload.data)) {
+      normalized.lecturas = payload.data.filter(item => !item.dispositivo_id || item.dispositivo_id === device);
+    } else if (Array.isArray(payload.items)) {
+      normalized.lecturas = payload.items.filter(item => !item.dispositivo_id || item.dispositivo_id === device);
+    } else {
+      // try to find any nested array of readings
+      const nested = Object.values(payload).find(v => Array.isArray(v) && v.length && (v[0].variable || v[0].valor || v[0].fecha || v[0].date));
+      if (Array.isArray(nested)) normalized.lecturas = nested.filter(item => !item.dispositivo_id || item.dispositivo_id === device);
+    }
+  }
+
+  // Remove any raw/bruta readings that shouldn't be shown in production
+  if (Array.isArray(normalized.lecturas)) {
+    normalized.lecturas = normalized.lecturas.filter(item => {
+      const varName = String(item.variable || item.name || '').toLowerCase();
+      // exclude entries containing 'bruta', 'bruto' or 'raw' anywhere (handles underscores)
+      return !/(bruta|bruto|raw)/i.test(varName);
+    });
+  }
+
+  const parsedHistory = parseTelemetryHistory(normalized);
   if (!parsedHistory.timestamps.length) {
     console.warn('El endpoint remoto no devolvió datos históricos reconocibles.', payload);
     return false;
   }
 
   trendHistory = parsedHistory;
+  // keep raw lecturas for full-history view (one DB row per table row)
+  if (Array.isArray(normalized.lecturas) && normalized.lecturas.length) {
+    trendHistoryRaw = normalized.lecturas.map(l => ({ ...l }));
+  } else {
+    trendHistoryRaw = [];
+  }
   saveChartHistory();
 
-  if (!trendChart) createTrendChart();
-  updateTrendChartData();
+  const isDbLecturas = !!(normalized && Array.isArray(normalized.lecturas) && normalized.lecturas.length);
+  if (foundPath && /lecturas|telemetria|historial|records|registros/.test(foundPath) || isDbLecturas) {
+    // Production-friendly message for DB-backed history
+    document.getElementById('history-source').innerText = 'Historial (Producción) — origen: Base de Datos (lecturas)';
+  } else {
+    document.getElementById('history-source').innerText = foundPath ? `Mostrando historial remoto desde ${foundPath}` : 'Mostrando historial remoto';
+  }
+
+  renderHistoryTable();
 
   return true;
 }
@@ -351,7 +472,9 @@ function updateTrendChartData() {
 }
 
 function createTrendChart() {
-  const ctx = document.getElementById('trend-chart').getContext('2d');
+  const canvasEl = document.getElementById('trend-chart');
+  if (!canvasEl) return;
+  const ctx = canvasEl.getContext('2d');
   if (trendChart) trendChart.destroy();
 
   trendChart = new Chart(ctx, {
@@ -400,6 +523,159 @@ function createTrendChart() {
         y: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148,163,184,0.15)' } }
       }
     }
+  });
+}
+
+function formatDateCL(timestamp) {
+  const d = new Date(timestamp);
+  return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Santiago' });
+}
+
+function formatTimeCL(timestamp) {
+  const d = new Date(timestamp);
+  return d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Santiago' });
+}
+
+function renderHistoryTable(filter = { type: 'all' }) {
+  console.info('renderHistoryTable filter:', filter);
+  const tbody = document.getElementById('history-tbody');
+  if (!tbody) return;
+
+  const rows = [];
+
+  // If we have raw DB rows, aggregate them by minute so each timestamp row shows the three variables
+  if (Array.isArray(trendHistoryRaw) && trendHistoryRaw.length) {
+    const points = {};
+    for (const lectura of trendHistoryRaw) {
+      const rawTs = lectura.fecha || lectura.date || lectura.timestamp || lectura.created_at || lectura.updated_at;
+      const tsObj = new Date(rawTs);
+      if (Number.isNaN(tsObj.getTime())) continue;
+      // group by minute (ignore seconds)
+      tsObj.setSeconds(0, 0);
+      const ts = tsObj.toISOString();
+      if (!points[ts]) points[ts] = { temperatura: null, humedad_aire: null, humedad_tierra: null, count: 0 };
+
+      const varKey = normalizeVariableName(lectura.variable || lectura.name || lectura.tipo || lectura.sensor || lectura.nombre || lectura.key || '');
+      const val = normalizeValue(lectura.valor ?? lectura.value ?? lectura.reading ?? lectura.medida ?? lectura.data ?? lectura.val);
+      if (!Number.isNaN(val) && varKey) {
+        points[ts][varKey] = val;
+      }
+      points[ts].count += 1;
+    }
+
+    const sortedTs = Object.keys(points).sort();
+    for (const ts of sortedTs) {
+      rows.push({
+        timestamp: ts,
+        date: formatDateCL(ts),
+        time: formatTimeCL(ts),
+        tierra: points[ts].humedad_tierra,
+        temperatura: points[ts].temperatura,
+        humedad_aire: points[ts].humedad_aire,
+        _count: points[ts].count
+      });
+    }
+  } else {
+    for (let i = 0; i < trendHistory.timestamps.length; i++) {
+      const ts = trendHistory.timestamps[i];
+      rows.push({
+        timestamp: ts,
+        date: formatDateCL(ts),
+        time: formatTimeCL(ts),
+        tierra: trendHistory.humedad_tierra[i],
+        temperatura: trendHistory.temperatura[i],
+        humedad_aire: trendHistory.humedad_aire[i]
+      });
+    }
+  }
+
+  // Apply filter
+  const now = new Date();
+  let filtered = rows;
+  if (filter.type === 'last3') {
+    const cutoff = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+    filtered = rows.filter(r => new Date(r.timestamp) >= cutoff);
+  } else if (filter.type === 'today') {
+    const todayStr = now.toLocaleDateString('es-CL', { timeZone: 'America/Santiago' });
+    console.info('Filtrando por hoy:', todayStr, 'rows total', rows.length);
+    filtered = rows.filter(r => r.date === todayStr);
+  } else if (filter.type === 'custom' && filter.date) {
+    const dateBase = filter.date; // YYYY-MM-DD
+    const targetDateStr = new Date(dateBase + 'T00:00:00').toLocaleDateString('es-CL', { timeZone: 'America/Santiago' });
+    console.info('Filtrando custom por fecha', dateBase, '→', targetDateStr, 'from/to', filter.from, filter.to);
+    if (filter.from && filter.to) {
+      const fromTs = new Date(dateBase + 'T' + filter.from + ':00');
+      const toTs = new Date(dateBase + 'T' + filter.to + ':00');
+      filtered = rows.filter(r => {
+        const t = new Date(r.timestamp);
+        return t >= fromTs && t <= toTs;
+      });
+    } else {
+      filtered = rows.filter(r => r.date === targetDateStr);
+    }
+  }
+
+  // Build table
+  tbody.innerHTML = '';
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;color:#94a3b8;text-align:center;">No hay datos para el filtro seleccionado.</td></tr>';
+    return;
+  }
+
+  filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  for (const r of filtered) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="Fecha" style="padding:8px 12px;border-top:1px solid rgba(148,163,184,0.06);">${r.date}</td>
+      <td data-label="Hora" style="padding:8px 12px;border-top:1px solid rgba(148,163,184,0.06);">${r.time}</td>
+      <td data-label="Tierra 🌱" style="padding:8px 12px;border-top:1px solid rgba(148,163,184,0.06);">${r.tierra ?? '--'}</td>
+      <td data-label="Temperatura ☀️" style="padding:8px 12px;border-top:1px solid rgba(148,163,184,0.06);">${r.temperatura ?? '--'}</td>
+      <td data-label="Humedad aire ☁️" style="padding:8px 12px;border-top:1px solid rgba(148,163,184,0.06);">${r.humedad_aire ?? '--'}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function applyHistoryFilterFromUI() {
+  const sel = document.getElementById('history-filter');
+  const type = sel ? sel.value : 'all';
+  const date = document.getElementById('filter-date')?.value;
+  const from = document.getElementById('filter-from')?.value;
+  const to = document.getElementById('filter-to')?.value;
+  const filter = { type };
+  if (date) filter.date = date;
+  if (from) filter.from = from;
+  if (to) filter.to = to;
+  console.info('Aplicando filtro desde UI', filter);
+  renderHistoryTable(filter);
+}
+
+function setupHistoryFilterUI() {
+  const sel = document.getElementById('history-filter');
+  const dateEl = document.getElementById('filter-date');
+  const fromEl = document.getElementById('filter-from');
+  const toEl = document.getElementById('filter-to');
+  const applyBtn = document.getElementById('filter-apply');
+  const resetBtn = document.getElementById('filter-reset');
+
+  if (!sel) return;
+  sel.addEventListener('change', () => {
+    const v = sel.value;
+    // Only show date/time inputs for custom ranges
+    dateEl.style.display = v === 'custom' ? 'inline-block' : 'none';
+    fromEl.style.display = v === 'custom' ? 'inline-block' : 'none';
+    toEl.style.display = v === 'custom' ? 'inline-block' : 'none';
+  });
+  applyBtn?.addEventListener('click', applyHistoryFilterFromUI);
+  resetBtn?.addEventListener('click', () => {
+    sel.value = 'all';
+    dateEl.value = '';
+    fromEl.value = '';
+    toEl.value = '';
+    dateEl.style.display = 'none';
+    fromEl.style.display = 'none';
+    toEl.style.display = 'none';
+    renderHistoryTable({ type: 'all' });
   });
 }
 
@@ -661,8 +937,9 @@ async function load() {
       filteredReadings.forEach(lectura => {
         const card = document.createElement("div");
         card.className = "reading-card";
+        const emoji = variableEmoji(lectura.variable);
         card.innerHTML = `
-          <div class="reading-label">${lectura.variable}</div>
+          <div class="reading-label">${emoji} ${lectura.variable}</div>
           <div class="reading-value">${lectura.valor}</div>
         `;
         grid.appendChild(card);
@@ -766,6 +1043,7 @@ function logout() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initializeChartFromStorage();
+  setupHistoryFilterUI();
   if (token && device) {
     showDashboard();
     startAutoRefresh();

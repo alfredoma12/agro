@@ -429,6 +429,21 @@ body {
   }
 }
 
+@media (max-width: 420px) {
+  .brand-title { font-size: 20px; }
+  .brand-copy { font-size: 13px; }
+  .dash-title { font-size: 20px; }
+  .metric-value { font-size: 20px; }
+  .reading-value { font-size: 20px; }
+
+  /* Make history table mobile-friendly: stacked rows */
+  #history-table thead { display: none; }
+  #history-table, #history-table tbody, #history-table tr, #history-table td { display: block; width: 100%; }
+  #history-table tr { margin-bottom: 12px; border-bottom: 1px solid rgba(148,163,184,0.06); }
+  #history-table td { padding: 10px 8px; }
+  #history-table td:before { content: attr(data-label); display: block; color:#94a3b8; font-size:12px; margin-bottom:4px; }
+}
+
 </style>
 </head>
 <body>
@@ -542,8 +557,40 @@ body {
       <div class="readings-title">Lecturas del Dispositivo</div>
       <div id="grid"></div>
       <div class="chart-card">
-        <div class="chart-title">Tendencia de datos</div>
-        <canvas id="trend-chart"></canvas>
+        <div class="chart-title">Historial de lecturas</div>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+          <div id="history-source" style="color:#94a3b8;font-size:13px;">Mostrando historial local</div>
+
+          <select id="history-filter" style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);color:#e2e8f0;border:1px solid rgba(148,163,184,0.08);">
+            <option value="all">Todo</option>
+            <option value="last3">Últimas 3 horas</option>
+            <option value="today">Hoy</option>
+            <option value="custom">Intervalo personalizado</option>
+          </select>
+
+          <input id="filter-date" type="date" style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);color:#e2e8f0;border:1px solid rgba(148,163,184,0.08);display:none;" />
+          <input id="filter-from" type="time" style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);color:#e2e8f0;border:1px solid rgba(148,163,184,0.08);display:none;" />
+          <input id="filter-to" type="time" style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);color:#e2e8f0;border:1px solid rgba(148,163,184,0.08);display:none;" />
+
+          <button id="filter-apply" class="btn btn-secondary" style="min-width: unset; padding:8px 12px;">Aplicar</button>
+          <button id="filter-reset" class="btn btn-secondary" style="min-width: unset; padding:8px 12px;">Restablecer</button>
+        </div>
+
+        <div style="overflow:auto;max-height:420px;">
+          <table id="history-table" style="width:100%;border-collapse:collapse;">
+            <thead style="position:sticky;top:0;background:rgba(15,23,42,0.98);">
+              <tr>
+                <th style="text-align:left;padding:8px 12px;color:#94a3b8;font-size:13px;">Fecha</th>
+                <th style="text-align:left;padding:8px 12px;color:#94a3b8;font-size:13px;">Hora</th>
+                <th style="text-align:left;padding:8px 12px;color:#94a3b8;font-size:13px;">Tierra 🌱</th>
+                <th style="text-align:left;padding:8px 12px;color:#94a3b8;font-size:13px;">Temperatura ☀️</th>
+                <th style="text-align:left;padding:8px 12px;color:#94a3b8;font-size:13px;">Humedad aire ☁️</th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody"></tbody>
+          </table>
+        </div>
       </div>
       <div class="dash-actions">
         <button class="btn btn-secondary" type="button" onclick="load()">Actualizar ahora</button>
