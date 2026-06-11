@@ -3,599 +3,981 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard Pro</title>
+<title>AgroSensor · Monitor de Campo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* ── TOKENS ─────────────────────────────────────────────── */
+:root {
+  --soil:       #3d2b1f;
+  --leaf:       #2d6a4f;
+  --leaf-mid:   #40916c;
+  --leaf-light: #74c69d;
+  --sky:        #90e0ef;
+  --sun:        #e9c46a;
+  --sun-deep:   #f4a261;
+  --cream:      #faf8f4;
+  --parchment:  #f0ebe1;
+  --border:     #ddd5c8;
+  --muted:      #8a7e72;
+  --text:       #1e1b18;
+  --text-soft:  #5c5248;
+  --error:      #c0392b;
+  --error-bg:   #fdf2f0;
+  --success:    #1b7a50;
+  --success-bg: #edfaf3;
+  --sidebar-w:  220px;
+  --radius:     14px;
+  --shadow:     0 2px 12px rgba(61,43,31,0.10);
+  --shadow-lg:  0 8px 32px rgba(61,43,31,0.13);
 }
+
+/* ── RESET ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.25), transparent 28%),
-              radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.18), transparent 22%),
-              linear-gradient(180deg, #090b16 0%, #111827 100%);
-  color: #e2e8f0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: var(--parchment);
+  color: var(--text);
   min-height: 100vh;
-  padding: 24px;
 }
 
-.app-header {
-  max-width: 1120px;
-  margin: 0 auto 25px;
+/* ── AUTH SCREEN ─────────────────────────────────────────── */
+#auth {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.auth-aside {
+  background: var(--leaf);
+  padding: 48px 40px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: space-between;
-  gap: 20px;
-}
-
-.brand-title {
-  display: block;
-  color: #f8fafc;
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-}
-
-.brand-copy {
-  color: #cbd5e1;
-  font-size: 15px;
-  margin-top: 8px;
-  max-width: 620px;
-}
-
-.brand-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-radius: 999px;
-  background: rgba(59, 130, 246, 0.18);
-  color: #bfdbfe;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.container {
-  width: 100%;
-  max-width: 1120px;
-  margin: 0 auto;
-}
-
-.card {
-  background: rgba(15, 23, 42, 0.95);
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 24px;
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
+  position: relative;
   overflow: hidden;
 }
 
-.auth-header {
+.auth-aside::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 30% 70%, rgba(116,198,157,0.22) 0%, transparent 55%),
+    radial-gradient(circle at 80% 20%, rgba(45,106,79,0.40) 0%, transparent 50%);
+}
+
+.auth-logo {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-logo-icon {
+  font-size: 36px;
+  line-height: 1;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.auth-logo-text {
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.03em;
+}
+
+.auth-logo-sub {
+  font-size: 14px;
+  color: rgba(255,255,255,0.65);
+  margin-top: 4px;
+}
+
+.auth-stats {
+  position: relative;
+  z-index: 1;
   display: flex;
-  gap: 0;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.auth-stat-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  margin-bottom: 4px;
+}
+
+.auth-stat-val {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.auth-panel {
+  background: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+}
+
+.auth-box {
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth-box-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.auth-box-sub {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 28px;
+}
+
+/* Tabs */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 28px;
 }
 
 .tab-btn {
   flex: 1;
-  padding: 18px 16px;
+  padding: 9px 12px;
   border: none;
+  border-radius: 8px;
   background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
   cursor: pointer;
-  font-size: 15px;
-  font-weight: 700;
-  transition: all 0.25s ease;
-  color: #94a3b8;
-  border-bottom: 3px solid transparent;
+  transition: background 0.18s, color 0.18s;
 }
 
 .tab-btn.active {
-  color: #eef2ff;
-  border-bottom-color: #7c3aed;
+  background: #fff;
+  color: var(--leaf);
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(61,43,31,0.10);
 }
 
-.tab-btn:hover {
-  color: #f8fafc;
-}
+.tab-btn:hover:not(.active) { color: var(--text); }
 
-.form-content {
-  padding: 32px;
-  display: none;
-}
+/* Form */
+.form-content { display: none; }
+.form-content.active { display: block; }
 
-.form-content.active {
-  display: block;
-}
-
-.form-group {
-  margin-bottom: 18px;
-}
+.form-group { margin-bottom: 16px; }
 
 .form-group label {
   display: block;
-  margin-bottom: 8px;
-  font-weight: 700;
-  color: #e2e8f0;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-bottom: 6px;
 }
 
 .form-group input {
   width: 100%;
-  padding: 14px 16px;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  border-radius: 14px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-family: inherit;
   font-size: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #f8fafc;
-  transition: border-color 0.3s ease, background 0.3s ease;
+  background: #fff;
+  color: var(--text);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: #7c3aed;
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--leaf-mid);
+  box-shadow: 0 0 0 3px rgba(64,145,108,0.15);
 }
 
 .form-group input.error {
-  border-color: #fb7185;
-  background: rgba(251, 113, 133, 0.08);
+  border-color: var(--error);
+  background: var(--error-bg);
 }
 
 .error-msg {
-  color: #fda4af;
-  font-size: 13px;
-  margin-top: 8px;
+  font-size: 12px;
+  color: var(--error);
+  margin-top: 6px;
   display: none;
 }
 
-.error-msg.show {
-  display: block;
-}
+.error-msg.show { display: block; }
 
 .success-box {
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  color: #a7f3d0;
-  padding: 16px;
-  border-radius: 14px;
+  background: var(--success-bg);
+  border: 1px solid rgba(27,122,80,0.25);
+  color: var(--success);
+  padding: 14px;
+  border-radius: var(--radius);
   font-size: 14px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   display: none;
 }
 
-.success-box.show {
-  display: block;
-}
+.success-box.show { display: block; }
 
 .btn {
-  width: 100%;
-  padding: 14px 18px;
-  border: none;
-  border-radius: 14px;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.3s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+  width: 100%;
+  background: var(--leaf);
   color: #fff;
 }
 
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 30px rgba(99, 102, 241, 0.18);
-}
-
-.btn-primary:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-  transform: none;
-}
+.btn-primary:hover { background: var(--leaf-mid); transform: translateY(-1px); box-shadow: var(--shadow); }
+.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
 .btn-secondary {
-  background: rgba(148, 163, 184, 0.15);
-  color: #e2e8f0;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  min-width: 180px;
+  background: var(--parchment);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  font-size: 13px;
 }
 
-.btn-secondary:hover {
-  background: rgba(148, 163, 184, 0.22);
+.btn-secondary:hover { background: var(--border); }
+
+.btn-danger {
+  background: #fff;
+  color: var(--error);
+  border: 1px solid #e8c4c0;
+  font-size: 13px;
 }
+
+.btn-danger:hover { background: var(--error-bg); }
 
 .spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255,255,255,0.35);
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
   border-radius: 50%;
-  border-top-color: white;
-  animation: spin 0.6s linear infinite;
+  animation: spin 0.65s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── DASHBOARD LAYOUT ────────────────────────────────────── */
 #dash {
   display: none;
-  animation: slideUp 0.5s ease;
+  min-height: 100vh;
+  animation: fadeIn 0.35s ease;
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
+
+/* Sidebar + main split */
+.dash-layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  min-height: 100vh;
 }
 
-.dash-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 32px;
-  background: linear-gradient(135deg, rgba(59,130,246,0.16), rgba(124,58,237,0.15));
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-}
-
-.dash-title {
-  color: #fff;
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1.05;
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 9px 18px;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 13px;
-  letter-spacing: 0.02em;
-}
-
-.status-online {
-  background: #16a34a;
-  color: #f8fafc;
-}
-
-.status-offline {
-  background: #dc2626;
-  color: #f8fafc;
-}
-
-.dash-content {
-  padding: 32px;
+/* SIDEBAR */
+.sidebar {
+  background: var(--soil);
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  padding: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
-.dash-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 18px;
+.sidebar-brand {
+  padding: 28px 20px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
-.metric-card {
-  background: rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 20px;
-  padding: 22px;
+.sidebar-icon { font-size: 28px; display: block; margin-bottom: 8px; }
+
+.sidebar-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
 }
 
-.metric-title {
-  color: #94a3b8;
+.sidebar-sub {
   font-size: 12px;
+  color: rgba(255,255,255,0.45);
+  margin-top: 2px;
+}
+
+.sidebar-section {
+  padding: 20px 12px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.3);
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  margin-bottom: 10px;
 }
 
-.metric-value {
-  font-size: 28px;
-  font-weight: 800;
-  color: #f8fafc;
+.sidebar-device {
+  margin: 0 12px 4px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 12px;
 }
 
-.status-meta {
-  color: #c7d2fe;
-  margin-top: 8px;
+.sidebar-device-label {
+  font-size: 10px;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+}
+
+.sidebar-device-name {
+  font-family: 'DM Mono', monospace;
   font-size: 13px;
+  color: var(--leaf-light);
+  margin-top: 3px;
+  word-break: break-all;
 }
 
-.readings-title {
-  font-size: 18px;
+.sidebar-status {
+  margin: 8px 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.55);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.online { background: var(--leaf-light); box-shadow: 0 0 0 3px rgba(116,198,157,0.25); }
+.status-dot.offline { background: #e74c3c; }
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 16px 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+/* MAIN */
+.main {
+  padding: 32px 36px;
+  overflow-y: auto;
+}
+
+/* Top bar */
+.main-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.main-title {
+  font-size: 20px;
   font-weight: 700;
-  color: #f8fafc;
+  color: var(--text);
+}
+
+.main-meta {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* KPI row */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.kpi {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.kpi-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  font-feature-settings: "tnum";
+}
+
+.kpi-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+/* Readings grid */
+.section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
 }
 
 #grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
 }
 
 .reading-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 20px;
-  padding: 20px;
-  text-align: left;
-  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 18px 16px;
+  box-shadow: var(--shadow);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  position: relative;
+  overflow: hidden;
 }
 
+.reading-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.reading-card.temp::before  { background: var(--sun-deep); }
+.reading-card.aire::before  { background: var(--sky); }
+.reading-card.tierra::before { background: var(--leaf-mid); }
+.reading-card.other::before  { background: var(--border); }
+
 .reading-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.22);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--leaf-light);
 }
 
 .reading-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 10px;
+  letter-spacing: 0.09em;
+  margin-bottom: 8px;
 }
 
 .reading-value {
-  font-size: 24px;
-  font-weight: 800;
-  color: #e2e8f0;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  font-feature-settings: "tnum";
+  line-height: 1;
 }
 
+/* Chart card */
 .chart-card {
-  background: rgba(15, 23, 42, 0.95);
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 24px;
-  padding: 20px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow);
+  margin-bottom: 28px;
+}
+
+.chart-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .chart-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  margin-bottom: 16px;
-  color: #f8fafc;
+  color: var(--text);
 }
 
-#trend-chart {
-  width: 100%;
-  height: 260px !important;
-  max-height: 260px;
-}
-
-#trend-chart {
-  display: block;
-}
-
-.dash-header-right {
+.chart-legend {
   display: flex;
   gap: 14px;
-  align-items: center;
-  justify-content: flex-end;
   flex-wrap: wrap;
 }
 
-.btn-logout:hover {
-  background: #dc2626;
-  box-shadow: 0 16px 32px rgba(239, 68, 68, 0.2);
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
-@media (max-width: 900px) {
-  .dash-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
-@media (max-width: 640px) {
-  .app-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .dash-actions {
-    flex-direction: column;
-    justify-content: stretch;
-    align-items: stretch;
-  }
-
-  .dash-summary {
-    grid-template-columns: 1fr;
-  }
-
-  #grid {
-    grid-template-columns: 1fr;
-  }
+/* Chart canvas wrapper: fixed height avoids Chart.js collapse */
+.chart-wrap {
+  position: relative;
+  height: 240px;
+  width: 100%;
 }
 
-@media (max-width: 520px) {
-  .chart-card {
-    padding: 18px;
+#trend-chart {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* History table card */
+.history-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow);
+  margin-bottom: 28px;
+}
+
+.history-filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--parchment);
+}
+
+.filter-select, .filter-input {
+  padding: 8px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--cream);
+  color: var(--text);
+}
+
+.filter-select:focus, .filter-input:focus {
+  outline: none;
+  border-color: var(--leaf-mid);
+}
+
+#history-source {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+}
+
+.history-table-wrap {
+  overflow: auto;
+  max-height: 380px;
+  border-radius: 8px;
+  border: 1px solid var(--parchment);
+}
+
+#history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+#history-table thead {
+  position: sticky;
+  top: 0;
+  background: var(--parchment);
+  z-index: 2;
+}
+
+#history-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+#history-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--parchment);
+  color: var(--text);
+  font-feature-settings: "tnum";
+}
+
+#history-table tbody tr:hover { background: #fdfaf7; }
+#history-table tbody tr:last-child td { border-bottom: none; }
+
+/* Status badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.status-online  { background: #edfaf3; color: var(--success); }
+.status-offline { background: var(--error-bg); color: var(--error); }
+
+/* Admin section separator */
+.admin-sep {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 20px 0;
+}
+
+.admin-subtitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  margin-bottom: 14px;
+}
+
+/* ── MOBILE ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  #auth { grid-template-columns: 1fr; }
+  .auth-aside { display: none; }
+
+  .dash-layout { grid-template-columns: 1fr; }
+
+  .sidebar {
+    height: auto;
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 10px;
   }
 
-  .reading-card {
-    padding: 18px;
-  }
+  .sidebar-brand { padding: 0; border: none; display: flex; align-items: center; gap: 8px; }
+  .sidebar-icon { font-size: 20px; margin: 0; }
+  .sidebar-name { font-size: 15px; }
+  .sidebar-sub, .sidebar-section, .sidebar-device-label { display: none; }
+  .sidebar-device { margin: 0; padding: 6px 10px; }
+  .sidebar-status { margin: 0; }
+  .sidebar-bottom { margin: 0; padding: 0; border: none; }
+
+  .main { padding: 18px 16px; }
+  .main-topbar { flex-direction: column; align-items: flex-start; gap: 12px; }
+
+  .kpi-row { grid-template-columns: 1fr 1fr; }
+
+  #grid { grid-template-columns: 1fr 1fr; }
+
+  /* Stacked table on small screens */
+  #history-table thead { display: none; }
+  #history-table, #history-table tbody, #history-table tr, #history-table td { display: block; width: 100%; }
+  #history-table tr { margin-bottom: 10px; border-bottom: 2px solid var(--parchment); }
+  #history-table td { padding: 8px 10px; }
+  #history-table td::before { content: attr(data-label); display: block; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 2px; }
 }
 
 @media (max-width: 420px) {
-  .brand-title { font-size: 20px; }
-  .brand-copy { font-size: 13px; }
-  .dash-title { font-size: 20px; }
-  .metric-value { font-size: 20px; }
-  .reading-value { font-size: 20px; }
-
-  /* Make history table mobile-friendly: stacked rows */
-  #history-table thead { display: none; }
-  #history-table, #history-table tbody, #history-table tr, #history-table td { display: block; width: 100%; }
-  #history-table tr { margin-bottom: 12px; border-bottom: 1px solid rgba(148,163,184,0.06); }
-  #history-table td { padding: 10px 8px; }
-  #history-table td:before { content: attr(data-label); display: block; color:#94a3b8; font-size:12px; margin-bottom:4px; }
+  .kpi-row { grid-template-columns: 1fr; }
+  #grid { grid-template-columns: 1fr; }
 }
-
 </style>
 </head>
 <body>
-<div class="app-header">
-  <div>
-    <span class="brand-title">Dashboard Pro</span>
-    <p class="brand-copy">Monitoreo de dispositivo IoT con diseño profesional. Datos limpios, estado claro y tendencias en tiempo real para entornos de producción.</p>
+
+<!-- ── AUTH ──────────────────────────────────────────────── -->
+<div id="auth">
+  <aside class="auth-aside">
+    <div class="auth-logo">
+      <span class="auth-logo-icon">🌿</span>
+      <div class="auth-logo-text">AgroSensor</div>
+      <div class="auth-logo-sub">Monitoreo de campo en tiempo real</div>
+    </div>
+    <div class="auth-stats">
+      <div>
+        <div class="auth-stat-label">Variables monitoreadas</div>
+        <div class="auth-stat-val">Temperatura · Humedad aire · Humedad tierra</div>
+      </div>
+      <div>
+        <div class="auth-stat-label">Actualización automática</div>
+        <div class="auth-stat-val">Cada 30 segundos</div>
+      </div>
+      <div>
+        <div class="auth-stat-label">Historial con filtros</div>
+        <div class="auth-stat-val">Por hora, día o rango personalizado</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="auth-panel">
+    <div class="auth-box">
+      <div class="auth-box-title">Accede a tu panel</div>
+      <div class="auth-box-sub">Ingresa tus credenciales o registra un nuevo dispositivo.</div>
+
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="showTab(event, 'login')">Ingresar</button>
+        <button class="tab-btn" onclick="showTab(event, 'register')">Registro</button>
+        <button class="tab-btn" onclick="showTab(event, 'admin-panel')">Admin</button>
+      </div>
+
+      <form id="login" class="form-content active" onsubmit="doLogin(event)">
+        <div class="form-group">
+          <label for="login-user">Usuario</label>
+          <input id="login-user" type="text" placeholder="Tu usuario" autocomplete="username" required>
+          <div class="error-msg"></div>
+        </div>
+        <div class="form-group">
+          <label for="login-pass">Contraseña</label>
+          <input id="login-pass" type="password" placeholder="Tu contraseña" autocomplete="current-password" required>
+          <div class="error-msg"></div>
+        </div>
+        <button type="submit" class="btn btn-primary" id="login-btn">Entrar</button>
+      </form>
+
+      <form id="register" class="form-content" onsubmit="doRegister(event)">
+        <div class="form-group">
+          <label for="reg-user">Usuario</label>
+          <input id="reg-user" type="text" placeholder="Elige un usuario" autocomplete="username" required>
+          <div class="error-msg"></div>
+        </div>
+        <div class="form-group">
+          <label for="reg-pass">Contraseña</label>
+          <input id="reg-pass" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" required>
+          <div class="error-msg"></div>
+        </div>
+        <div class="form-group">
+          <label for="reg-device">ID del dispositivo</label>
+          <input id="reg-device" type="text" placeholder="Ej: ESP32_PLANTA_TALLER" required>
+          <div class="error-msg"></div>
+        </div>
+        <div class="form-group">
+          <label for="reg-token">Token de activación</label>
+          <input id="reg-token" type="text" placeholder="Token de la etiqueta" required>
+          <div class="error-msg"></div>
+        </div>
+        <button type="submit" class="btn btn-primary" id="reg-btn">Crear cuenta</button>
+      </form>
+
+      <form id="admin-panel" class="form-content" onsubmit="doAdminRegisterDevice(event)">
+        <div class="form-group">
+          <label for="admin-master-key">Clave maestra de administrador</label>
+          <input id="admin-master-key" type="password" placeholder="Clave maestra" required>
+          <div class="error-msg"></div>
+        </div>
+        <hr class="admin-sep">
+        <div class="admin-subtitle">Pre-registrar equipo nuevo</div>
+
+        <div id="admin-success" class="success-box"></div>
+
+        <div class="form-group">
+          <label for="admin-device-id">ID del nuevo dispositivo</label>
+          <input id="admin-device-id" type="text" placeholder="Ej: ESP32_PLANTA_TALLER">
+          <div class="error-msg"></div>
+        </div>
+        <div class="form-group">
+          <label for="admin-device-token">Token de activación</label>
+          <input id="admin-device-token" type="text" placeholder="Genera un token seguro">
+          <div class="error-msg"></div>
+        </div>
+        <button type="submit" class="btn btn-primary" id="admin-btn">Registrar dispositivo</button>
+      </form>
+    </div>
   </div>
-  <span class="brand-badge">Producción · Tiempo real</span>
 </div>
 
-<div class="container">
-  <div id="auth" class="card">
-    <div class="auth-header">
-      <button class="tab-btn active" onclick="showTab(event, 'login')">Login</button>
-      <button class="tab-btn" onclick="showTab(event, 'register')">Registro</button>
-      <button class="tab-btn" onclick="showTab(event, 'admin-panel')">Admin</button>
-    </div>
+<!-- ── DASHBOARD ──────────────────────────────────────────── -->
+<div id="dash">
+  <div class="dash-layout">
 
-    <form id="login" class="form-content active" onsubmit="doLogin(event)">
-      <div class="form-group">
-        <label for="login-user">Usuario</label>
-        <input id="login-user" type="text" placeholder="Ingresa tu usuario" required>
-        <div class="error-msg"></div>
-      </div>
-      <div class="form-group">
-        <label for="login-pass">Contraseña</label>
-        <input id="login-pass" type="password" placeholder="Ingresa tu contraseña" required>
-        <div class="error-msg"></div>
-      </div>
-      <button type="submit" class="btn btn-primary" id="login-btn">Entrar</button>
-    </form>
-
-    <form id="register" class="form-content" onsubmit="doRegister(event)">
-      <div class="form-group">
-        <label for="reg-user">Usuario</label>
-        <input id="reg-user" type="text" placeholder="Elige un usuario" required>
-        <div class="error-msg"></div>
-      </div>
-      <div class="form-group">
-        <label for="reg-pass">Contraseña</label>
-        <input id="reg-pass" type="password" placeholder="Crea una contraseña" required>
-        <div class="error-msg"></div>
-      </div>
-      <div class="form-group">
-        <label for="reg-device">ID Dispositivo</label>
-        <input id="reg-device" type="text" placeholder="ID del dispositivo (ej: ESP32_PLANTA_TALLER)" required>
-        <div class="error-msg"></div>
-      </div>
-      <div class="form-group">
-        <label for="reg-token">Token de Autenticación</label>
-        <input id="reg-token" type="text" placeholder="Token de la etiqueta" required>
-        <div class="error-msg"></div>
-      </div>
-      <button type="submit" class="btn btn-primary" id="reg-btn">Crear Cuenta</button>
-    </form>
-
-    <form id="admin-panel" class="form-content" onsubmit="doAdminRegisterDevice(event)">
-      <div class="form-group">
-        <label for="admin-master-key">Clave Maestra de Admin</label>
-        <input id="admin-master-key" type="password" placeholder="Clave maestra de administración" required>
-        <div class="error-msg"></div>
-      </div>
-      <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-      <div style="font-size: 13px; color:#666; margin-bottom: 12px; font-weight: bold;">PRE-REGISTRAR EQUIPO NUEVO</div>
-      
-      <div id="admin-success" class="success-box"></div>
-
-      <div class="form-group">
-        <label for="admin-device-id">ID Nuevo Dispositivo</label>
-        <input id="admin-device-id" type="text" placeholder="Ej: ESP32_PLANTA_TALLER">
-        <div class="error-msg"></div>
-      </div>
-      <div class="form-group">
-        <label for="admin-device-token">Token de Activación a Asignar</label>
-        <input id="admin-device-token" type="text" placeholder="Ej: 123456 o genera uno seguro">
-        <div class="error-msg"></div>
-      </div>
-      <button type="submit" class="btn btn-primary" id="admin-btn">Alta de Dispositivo</button>
-    </form>
-  </div>
-
-  <div id="dash" class="card">
-    <div class="dash-header">
-      <div>
-        <span class="dash-title" id="device">Dashboard</span>
-        <div class="status-meta" id="status-meta">Esperando datos...</div>
-      </div>
-      <div class="dash-header-right">
-        <span class="status-badge status-offline" id="status">DESCONOCIDO</span>
-        <button class="btn btn-logout" type="button" onclick="logout()">Cerrar sesión</button>
-      </div>
-    </div>
-    <div class="dash-content">
-      <div class="dash-actions">
-        <div class="dash-summary">
-          <div class="metric-card">
-            <div class="metric-title">Última actualización</div>
-            <div class="metric-value" id="last-update">--</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-title">Variables en el gráfico</div>
-            <div class="metric-value">Temperatura · Humedad aire · Humedad tierra</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-title">Estado del sensor</div>
-            <div class="metric-value" id="sensor-status">--</div>
-          </div>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="sidebar-icon">🌿</span>
+        <div>
+          <div class="sidebar-name">AgroSensor</div>
+          <div class="sidebar-sub">Panel de campo</div>
         </div>
       </div>
-      <div class="readings-title">Lecturas del Dispositivo</div>
+
+      <div class="sidebar-section">Dispositivo activo</div>
+      <div class="sidebar-device">
+        <div class="sidebar-device-label">ID</div>
+        <div class="sidebar-device-name" id="device">—</div>
+      </div>
+
+      <div class="sidebar-status">
+        <span class="status-dot offline" id="sidebar-dot"></span>
+        <span id="sidebar-status-text">Offline</span>
+      </div>
+
+      <div style="flex:1"></div>
+
+      <div class="sidebar-bottom">
+        <button class="btn btn-danger" style="width:100%;font-size:13px;" type="button" onclick="logout()">
+          ↩ Cerrar sesión
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <div class="main-topbar">
+        <div>
+          <div class="main-title" id="main-title">Panel de monitoreo</div>
+          <div class="main-meta" id="status-meta">Esperando datos del sensor...</div>
+        </div>
+        <div class="topbar-actions">
+          <span class="status-badge status-offline" id="status">DESCONOCIDO</span>
+          <button class="btn btn-secondary" type="button" onclick="load()">↻ Actualizar</button>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="kpi-label">⏱ Última lectura</div>
+          <div class="kpi-value" id="last-update" style="font-size:18px;">--</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">📡 Estado del sensor</div>
+          <div class="kpi-value" id="sensor-status">--</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">📊 Variables activas</div>
+          <div class="kpi-value" style="font-size:14px;padding-top:4px;">Temp · Aire · Tierra</div>
+        </div>
+      </div>
+
+      <!-- Readings -->
+      <div class="section-header">
+        <span class="section-title">Lecturas actuales</span>
+      </div>
       <div id="grid"></div>
+
+      <!-- Trend chart -->
       <div class="chart-card">
-        <div class="chart-title">Historial de lecturas</div>
+        <div class="chart-card-header">
+          <div class="chart-title">Tendencia histórica</div>
+          <div class="chart-legend">
+            <div class="legend-item"><span class="legend-dot" style="background:#f4a261"></span>Temperatura</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#90e0ef"></span>Humedad aire</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#40916c"></span>Humedad tierra</div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="trend-chart"></canvas>
+        </div>
+      </div>
 
-        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-          <div id="history-source" style="color:#94a3b8;font-size:13px;">Mostrando historial local</div>
+      <!-- History table -->
+      <div class="history-card">
+        <div class="chart-card-header">
+          <div class="chart-title">Historial de lecturas</div>
+          <span id="history-source" style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;"></span>
+        </div>
 
-          <select id="history-filter" style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);color:#e2e8f0;border:1px solid rgba(148,163,184,0.08);">
-            <option value="all">Todo</option>
+        <div class="history-filters">
+          <select id="history-filter" class="filter-select">
+            <option value="all">Todo el historial</option>
             <option value="last3">Últimas 3 horas</option>
             <option value="today">Hoy</option>
-            <option value="custom">Intervalo personalizado</option>
+            <option value="custom">Rango personalizado</option>
           </select>
-
-          <input id="filter-date" type="date" style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);color:#e2e8f0;border:1px solid rgba(148,163,184,0.08);display:none;" />
-          <input id="filter-from" type="time" style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);color:#e2e8f0;border:1px solid rgba(148,163,184,0.08);display:none;" />
-          <input id="filter-to" type="time" style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);color:#e2e8f0;border:1px solid rgba(148,163,184,0.08);display:none;" />
-
-          <button id="filter-apply" class="btn btn-secondary" style="min-width: unset; padding:8px 12px;">Aplicar</button>
-          <button id="filter-reset" class="btn btn-secondary" style="min-width: unset; padding:8px 12px;">Restablecer</button>
+          <input id="filter-date" type="date" class="filter-input" style="display:none;" />
+          <input id="filter-from" type="time" class="filter-input" style="display:none;" />
+          <input id="filter-to"   type="time" class="filter-input" style="display:none;" />
+          <button id="filter-apply" class="btn btn-secondary">Aplicar</button>
+          <button id="filter-reset" class="btn btn-secondary">Restablecer</button>
         </div>
 
-        <div style="overflow:auto;max-height:420px;">
-          <table id="history-table" style="width:100%;border-collapse:collapse;">
-            <thead style="position:sticky;top:0;background:rgba(15,23,42,0.98);">
+        <div class="history-table-wrap">
+          <table id="history-table">
+            <thead>
               <tr>
-                <th style="text-align:left;padding:8px 12px;color:#94a3b8;font-size:13px;">Fecha</th>
-                <th style="text-align:left;padding:8px 12px;color:#94a3b8;font-size:13px;">Hora</th>
-                <th style="text-align:left;padding:8px 12px;color:#94a3b8;font-size:13px;">Tierra 🌱</th>
-                <th style="text-align:left;padding:8px 12px;color:#94a3b8;font-size:13px;">Temperatura ☀️</th>
-                <th style="text-align:left;padding:8px 12px;color:#94a3b8;font-size:13px;">Humedad aire ☁️</th>
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>🌱 Tierra</th>
+                <th>☀️ Temperatura</th>
+                <th>☁️ Humedad aire</th>
               </tr>
             </thead>
             <tbody id="history-tbody"></tbody>
           </table>
         </div>
       </div>
-      <div class="dash-actions">
-        <button class="btn btn-secondary" type="button" onclick="load()">Actualizar ahora</button>
-      </div>
-    </div>
+
+    </main>
   </div>
 </div>
 

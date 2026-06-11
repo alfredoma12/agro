@@ -1,57 +1,29 @@
 const API_URL = "https://reception-holland-tcp-defensive.trycloudflare.com";
 
-let token = localStorage.getItem("token");
-let device = localStorage.getItem("device");
-let loadInterval = null;
-let trendChart = null;
-let trendHistory = { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
-let trendHistoryRaw = []; // raw DB rows (one entry per lectura)
-const HISTORY_STORAGE_KEY = 'dashboard-history';
-const AUTO_REFRESH_INTERVAL_MS = 30000; // 30 segundos para reflejar cambios del sensor rápidamente
+// ── BUG FIX: leer token/device de localStorage de forma segura
+let token  = null;
+let device = null;
 
-// Validación de inputs
+try {
+  token  = localStorage.getItem("token");
+  device = localStorage.getItem("device");
+} catch (_) { /* entorno sin localStorage */ }
+
+let loadInterval    = null;
+let trendChart      = null;
+let trendHistory    = { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
+let trendHistoryRaw = [];
+
+const HISTORY_STORAGE_KEY      = 'dashboard-history';
+const AUTO_REFRESH_INTERVAL_MS = 30000;
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+
 function validateInput(value, type = 'text') {
   const trimmed = value.trim();
   if (!trimmed) return false;
   if (type === 'password') return trimmed.length >= 6;
   return trimmed.length >= 3;
-}
-
-// Mostrar/Ocultar pestañas
-function showTab(event, tabName) {
-  // Ocultar todos los formularios
-  document.querySelectorAll('.form-content').forEach(form => {
-    form.classList.remove('active');
-  });
-  
-  // Desactivar todos los botones
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.remove('active');
-  });
-  
-  // Mostrar formulario seleccionado
-  document.getElementById(tabName).classList.add('active');
-  
-  // Activar botón seleccionado utilizando el evento capturado
-  event.target.classList.add('active');
-  
-  // Limpiar cualquier residuo de errores al cambiar de pestaña
-  clearErrors();
-  document.getElementById("admin-success").classList.remove('show');
-}
-
-// Mostrar/ocultar spinner
-function setButtonLoading(buttonId, isLoading) {
-  const btn = document.getElementById(buttonId);
-  btn.disabled = isLoading;
-  
-  if (isLoading) {
-    btn.innerHTML = '<span class="spinner"></span> Cargando...';
-  } else {
-    if (buttonId === 'login-btn') btn.innerHTML = 'Entrar';
-    else if (buttonId === 'reg-btn') btn.innerHTML = 'Crear Cuenta';
-    else if (buttonId === 'admin-btn') btn.innerHTML = 'Alta de Dispositivo';
-  }
 }
 
 function normalizeValue(value) {
@@ -69,7 +41,7 @@ function normalizeVariableName(variable) {
   if (/temp(eratura)?(\b|$)|°c|celsius|temperature|temp\b/.test(name)) return 'temperatura';
 
   const tierraPatterns = /humedad.*(tierra|suelo|sustrato)|(?:tierra|suelo|sustrato).*(humedad)|(^|[_\s-])(tierra|suelo|sustrato)([_\s-]|$)|soil.*(moisture|humidity)|(?:moisture|humidity).*(soil|ground)/;
-  const airePatterns = /humedad.*(aire|ambient|ambiente)|(?:aire|ambient|ambiente).*(humedad)|air.*humidity|humidity.*air/;
+  const airePatterns   = /humedad.*(aire|ambient|ambiente)|(?:aire|ambient|ambiente).*(humedad)|air.*humidity|humidity.*air/;
 
   if (tierraPatterns.test(name) && !/tierra[_\s-]*bruta|bruta|bruto|raw/.test(name)) return 'humedad_tierra';
   if (airePatterns.test(name)) return 'humedad_aire';
@@ -82,53 +54,98 @@ function normalizeVariableName(variable) {
   return null;
 }
 
+// Asigna clase CSS a la reading-card según el tipo de variable
+function variableCardClass(variable) {
+  const key = normalizeVariableName(variable) || '';
+  if (key === 'temperatura')   return 'temp';
+  if (key === 'humedad_aire')  return 'aire';
+  if (key === 'humedad_tierra') return 'tierra';
+  return 'other';
+}
+
 function variableEmoji(variable) {
-  const key = normalizeVariableName(variable) || (String(variable || '').toLowerCase());
-  if (/temp|temperatura|°c|celsius/.test(key)) return '☀️';
-  if (/humedad_aire|aire|ambiente|ambient|humidity.*air/.test(key)) return '☁️';
+  const key = normalizeVariableName(variable) || String(variable || '').toLowerCase();
+  if (/temp|temperatura|°c|celsius/.test(key))           return '☀️';
+  if (/humedad_aire|aire|ambiente|ambient/.test(key))     return '☁️';
   if (/humedad_tierra|tierra|suelo|sustrato|soil/.test(key)) return '🌱';
   return '';
 }
 
+// ── TIMESTAMP HELPERS ─────────────────────────────────────────────────────────
+
 function parseSensorTimestamp(data) {
   if (!data || typeof data !== 'object') return null;
-
-  const timestampFields = ['timestamp', 'updated_at', 'created_at', 'fecha', 'date', 'hora', 'time'];
-  for (const field of timestampFields) {
+  const fields = ['timestamp', 'updated_at', 'created_at', 'fecha', 'date', 'hora', 'time'];
+  for (const field of fields) {
     if (data[field]) {
-      const parsed = new Date(data[field]);
-      if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+      const parsed = parseTimestampValue(data[field]);
+      if (parsed) return parsed.toISOString();
     }
   }
-
   if (Array.isArray(data.lecturas)) {
     for (const lectura of data.lecturas) {
-      if (lectura && typeof lectura === 'object') {
-        for (const field of timestampFields) {
-          if (lectura[field]) {
-            const parsed = new Date(lectura[field]);
-            if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
-          }
+      if (!lectura || typeof lectura !== 'object') continue;
+      for (const field of fields) {
+        if (lectura[field]) {
+          const parsed = parseTimestampValue(lectura[field]);
+          if (parsed) return parsed.toISOString();
         }
       }
     }
   }
-
   return null;
 }
 
-function loadChartHistory() {
-  const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
-  if (!stored) return { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
+function parseTimestampValue(raw) {
+  if (!raw) return null;
+  if (raw instanceof Date) return raw;
+  const value = String(raw).trim();
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  const normalized = value.replace(/\//g, '-');
+  let match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})[ T]([0-9]{2}):([0-9]{2})(?::([0-9]{2}))?/.exec(normalized);
+  if (match) return parseSantiagoLocalTime(match[1], match[2], match[3], match[4], match[5], match[6] || '00');
+  match = /^([0-9]{2})-([0-9]{2})-([0-9]{4})[ T]([0-9]{2}):([0-9]{2})(?::([0-9]{2}))?/.exec(normalized);
+  if (match) return parseSantiagoLocalTime(match[3], match[2], match[1], match[4], match[5], match[6] || '00');
+  const fallback = new Date(value);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
 
+function parseSantiagoLocalTime(year, month, day, hour, minute, second = '00') {
+  const utcCandidate = new Date(Date.UTC(+year, +month - 1, +day, +hour, +minute, +second));
+  const offsetMs = getTimeZoneOffsetMs('America/Santiago', utcCandidate);
+  return new Date(utcCandidate.getTime() - offsetMs);
+}
+
+function getTimeZoneOffsetMs(timeZone, date) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+  const parts = formatter.formatToParts(date).reduce((acc, part) => {
+    if (part.type !== 'literal') acc[part.type] = part.value;
+    return acc;
+  }, {});
+  const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+  return asUtc - date.getTime();
+}
+
+// ── HISTORY PERSISTENCE ───────────────────────────────────────────────────────
+
+function loadChartHistory() {
   try {
+    const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
+    if (!stored) return { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
     const parsed = JSON.parse(stored);
     return {
-      timestamps: Array.isArray(parsed.timestamps) ? parsed.timestamps : [],
-      temperatura: Array.isArray(parsed.temperatura) ? parsed.temperatura : [],
-      humedad_aire: Array.isArray(parsed.humedad_aire) ? parsed.humedad_aire : [],
+      timestamps:    Array.isArray(parsed.timestamps)    ? parsed.timestamps    : [],
+      temperatura:   Array.isArray(parsed.temperatura)   ? parsed.temperatura   : [],
+      humedad_aire:  Array.isArray(parsed.humedad_aire)  ? parsed.humedad_aire  : [],
       humedad_tierra: Array.isArray(parsed.humedad_tierra) ? parsed.humedad_tierra : [],
-      rawLecturas: Array.isArray(parsed.rawLecturas) ? parsed.rawLecturas : []
+      rawLecturas:   Array.isArray(parsed.rawLecturas)   ? parsed.rawLecturas   : []
     };
   } catch {
     return { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
@@ -136,12 +153,16 @@ function loadChartHistory() {
 }
 
 function saveChartHistory() {
-  const toStore = Object.assign({}, trendHistory, { rawLecturas: Array.isArray(trendHistoryRaw) ? trendHistoryRaw : [] });
-  localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(toStore));
+  try {
+    const toStore = { ...trendHistory, rawLecturas: Array.isArray(trendHistoryRaw) ? trendHistoryRaw : [] };
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(toStore));
+  } catch { /* cuota excedida u otro error */ }
 }
 
+// ── TELEMETRY PARSING ─────────────────────────────────────────────────────────
+
 function parseTelemetryHistory(payload) {
-  let items = [];
+  let items  = [];
   const points = {};
 
   if (Array.isArray(payload)) {
@@ -150,40 +171,33 @@ function parseTelemetryHistory(payload) {
     if (Array.isArray(payload.lecturas)) {
       items = payload.lecturas;
     } else {
-      const candidates = ['telemetria', 'historial', 'data', 'registros', 'records', 'items'];
-      for (const candidate of candidates) {
-        if (Array.isArray(payload[candidate])) {
-          items = payload[candidate];
-          break;
-        }
+      for (const key of ['telemetria', 'historial', 'data', 'registros', 'records', 'items']) {
+        if (Array.isArray(payload[key])) { items = payload[key]; break; }
       }
     }
 
     if (!items.length) {
-      const nested = Object.values(payload).find(value => Array.isArray(value));
+      const nested = Object.values(payload).find(v => Array.isArray(v));
       if (Array.isArray(nested)) items = nested;
 
-      const timestamps = payload.timestamps || payload.fechas || payload.dates;
-      const seriesTemperatura = payload.temperatura || payload.temp || payload.temperature;
-      const seriesAire = payload.humedad_aire || payload.humedad_ambiente || payload.humidity_air || payload.humidity;
-      const seriesTierra = payload.humedad_tierra || payload.humedad_suelo || payload.soil_humidity || payload.soil_moisture;
+      const ts    = payload.timestamps || payload.fechas || payload.dates;
+      const sTemp = payload.temperatura || payload.temp || payload.temperature;
+      const sAire = payload.humedad_aire || payload.humedad_ambiente || payload.humidity_air || payload.humidity;
+      const sTierra = payload.humedad_tierra || payload.humedad_suelo || payload.soil_humidity || payload.soil_moisture;
 
-      if (Array.isArray(timestamps) && (Array.isArray(seriesTemperatura) || Array.isArray(seriesAire) || Array.isArray(seriesTierra))) {
-        const maxLength = Math.max(
-          timestamps.length,
-          Array.isArray(seriesTemperatura) ? seriesTemperatura.length : 0,
-          Array.isArray(seriesAire) ? seriesAire.length : 0,
-          Array.isArray(seriesTierra) ? seriesTierra.length : 0
-        );
-
-        for (let index = 0; index < maxLength; index += 1) {
-          const ts = new Date(timestamps[index]);
-          if (Number.isNaN(ts.getTime())) continue;
-          const timestamp = ts.toISOString();
+      if (Array.isArray(ts) && (Array.isArray(sTemp) || Array.isArray(sAire) || Array.isArray(sTierra))) {
+        const maxLen = Math.max(ts.length,
+          Array.isArray(sTemp)   ? sTemp.length   : 0,
+          Array.isArray(sAire)   ? sAire.length   : 0,
+          Array.isArray(sTierra) ? sTierra.length : 0);
+        for (let i = 0; i < maxLen; i++) {
+          const t = new Date(ts[i]);
+          if (Number.isNaN(t.getTime())) continue;
+          const timestamp = t.toISOString();
           points[timestamp] = {
-            temperatura: Array.isArray(seriesTemperatura) ? normalizeValue(seriesTemperatura[index]) : null,
-            humedad_aire: Array.isArray(seriesAire) ? normalizeValue(seriesAire[index]) : null,
-            humedad_tierra: Array.isArray(seriesTierra) ? normalizeValue(seriesTierra[index]) : null
+            temperatura:    Array.isArray(sTemp)   ? normalizeValue(sTemp[i])   : null,
+            humedad_aire:   Array.isArray(sAire)   ? normalizeValue(sAire[i])   : null,
+            humedad_tierra: Array.isArray(sTierra) ? normalizeValue(sTierra[i]) : null
           };
         }
       }
@@ -192,282 +206,44 @@ function parseTelemetryHistory(payload) {
 
   items.forEach(lectura => {
     if (!lectura || typeof lectura !== 'object') return;
-
     const timestamp = parseSensorTimestamp(lectura);
     if (!timestamp) return;
-
-    const key = normalizeVariableName(lectura.variable || lectura.name || lectura.tipo || lectura.sensor || lectura.nombre || lectura.key || '');
+    const key = normalizeVariableName(
+      lectura.variable || lectura.name || lectura.tipo || lectura.sensor || lectura.nombre || lectura.key || ''
+    );
     if (!key) return;
-
     const rawValue = lectura.valor ?? lectura.value ?? lectura.reading ?? lectura.medida ?? lectura.data ?? lectura.val;
     const value = normalizeValue(rawValue);
     if (Number.isNaN(value)) return;
-
-    if (!points[timestamp]) {
-      points[timestamp] = { temperatura: null, humedad_aire: null, humedad_tierra: null };
-    }
+    if (!points[timestamp]) points[timestamp] = { temperatura: null, humedad_aire: null, humedad_tierra: null };
     points[timestamp][key] = value;
   });
 
   const timestamps = Object.keys(points).sort();
   const result = { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
-
   timestamps.slice(-96).forEach(ts => {
     result.timestamps.push(ts);
     result.temperatura.push(points[ts].temperatura);
     result.humedad_aire.push(points[ts].humedad_aire);
     result.humedad_tierra.push(points[ts].humedad_tierra);
   });
-
   return result;
 }
 
-function initializeChartFromStorage() {
-  const stored = loadChartHistory();
-  trendHistory = stored;
-  trendHistoryRaw = Array.isArray(stored.rawLecturas) ? stored.rawLecturas : [];
-  if (!trendHistory.timestamps.length && !trendHistoryRaw.length) return false;
-  renderHistoryTable();
-  return true;
-}
-
-async function loadHistoricalData() {
-  if (!token || !device) return false;
-
-  // Try to fetch full DB lecturas via paginated endpoint first
-  async function fetchAllLecturas() {
-    const all = [];
-    const pageSize = 1000;
-    let offset = 0;
-    try {
-      while (true) {
-        const url = `${API_URL}/api/lecturas?dispositivo=${encodeURIComponent(device)}&limit=${pageSize}&offset=${offset}`;
-        const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-        if (!resp.ok) {
-          // try fallback without query params
-          const resp2 = await fetch(`${API_URL}/api/lecturas`, { headers: { Authorization: 'Bearer ' + token } });
-          if (!resp2.ok) return null;
-          const body2 = await resp2.json();
-          if (Array.isArray(body2)) return body2;
-          if (Array.isArray(body2.lecturas)) return body2.lecturas;
-          return null;
-        }
-
-        const body = await resp.json();
-        let pageRows = [];
-        if (Array.isArray(body)) pageRows = body;
-        else if (Array.isArray(body.lecturas)) pageRows = body.lecturas;
-        else if (Array.isArray(body.rows)) pageRows = body.rows;
-        else break;
-
-        if (!pageRows.length) break;
-        all.push(...pageRows.filter(r => !r.dispositivo_id || r.dispositivo_id === device));
-
-        if (pageRows.length < pageSize) break;
-        offset += pageSize;
-      }
-      return all.length ? all : null;
-    } catch (e) {
-      console.warn('Error fetching /api/lecturas paginated', e);
-      return null;
-    }
-  }
-
-  // First, try the dedicated lecturas endpoint (paginated). If it returns rows, use it.
-  let payload = null;
-  let foundPath = null;
-
-  try {
-    const lecturasAll = await fetchAllLecturas();
-    if (Array.isArray(lecturasAll) && lecturasAll.length) {
-      payload = { lecturas: lecturasAll };
-      foundPath = '/api/lecturas';
-      console.info('Historial recibido desde /api/lecturas (paginated)');
-    }
-  } catch (e) {
-    console.warn('Error intentando /api/lecturas:', e);
-  }
-
-  const paths = [
-    `/api/dispositivo/${device}/actual`,
-    `/api/dispositivo/${device}/telemetria`,
-    `/api/dispositivo/${device}/historial`,
-    `/api/dispositivo/${device}/lecturas`,
-    `/api/dispositivo/${device}/historico`,
-    `/api/dispositivo/${device}/datos`,
-    `/api/dispositivo/${device}/history`,
-    `/api/dispositivo/${device}/telemetry`,
-    `/api/dispositivo/${device}/mediciones`,
-    `/api/dispositivo/${device}/measurements`,
-    `/api/dispositivo/${device}/registro`,
-    `/api/dispositivo/${device}/records`,
-    `/api/lecturas?dispositivo=${device}`,
-    `/api/telemetria?dispositivo=${device}`,
-    `/api/historial?dispositivo=${device}`,
-    `/api/records?dispositivo=${device}`,
-    `/api/dispositivo?dispositivo=${device}`,
-    `/api/dispositivo/${device}`
-  ];
-
-  if (!payload) {
-    for (const path of paths) {
-      try {
-        const response = await fetch(API_URL + path, {
-          headers: { Authorization: 'Bearer ' + token }
-        });
-
-        if (response.status === 401) {
-          logout();
-          return false;
-        }
-
-        if (!response.ok) {
-          console.warn('No se encontró historial en', path, '(', response.status, response.statusText, ')');
-          continue;
-        }
-
-        payload = await response.json();
-        foundPath = path;
-        console.info('Historial recibido desde', path);
-        if (payload) break;
-      } catch (error) {
-        console.warn('No se pudo obtener historial desde', path, error);
-        continue;
-      }
-    }
-  }
-
-  if (!payload) {
-    console.warn('No se encontró historial remoto; usando datos locales existentes si los hay.');
-    return false;
-  }
-
-  // Normalize payload into a { lecturas: [...] } shape and filter by dispositivo
-  let normalized = { lecturas: [] };
-
-  if (Array.isArray(payload)) {
-    // If payload is directly an array of lecturas (DB collection), filter by dispositivo if present
-    if (payload.length && payload[0] && (payload[0].variable || payload[0].valor || payload[0].fecha || payload[0].date)) {
-      normalized.lecturas = payload.filter(item => !item.dispositivo_id || item.dispositivo_id === device);
-    } else if (payload.length && payload[0] && payload[0].dispositivo_id) {
-      // array of device objects: collect nested lecturas
-      normalized.lecturas = payload
-        .filter(p => p.dispositivo_id === device)
-        .flatMap(p => Array.isArray(p.lecturas) ? p.lecturas : []);
-    } else {
-      normalized.lecturas = payload;
-    }
-  } else if (payload && typeof payload === 'object') {
-    if (Array.isArray(payload.lecturas)) {
-      normalized.lecturas = payload.lecturas.filter(item => !item.dispositivo_id || item.dispositivo_id === device);
-    } else if (Array.isArray(payload.data)) {
-      normalized.lecturas = payload.data.filter(item => !item.dispositivo_id || item.dispositivo_id === device);
-    } else if (Array.isArray(payload.items)) {
-      normalized.lecturas = payload.items.filter(item => !item.dispositivo_id || item.dispositivo_id === device);
-    } else {
-      // try to find any nested array of readings
-      const nested = Object.values(payload).find(v => Array.isArray(v) && v.length && (v[0].variable || v[0].valor || v[0].fecha || v[0].date));
-      if (Array.isArray(nested)) normalized.lecturas = nested.filter(item => !item.dispositivo_id || item.dispositivo_id === device);
-    }
-  }
-
-  // Remove any raw/bruta readings that shouldn't be shown in production
-  if (Array.isArray(normalized.lecturas)) {
-    normalized.lecturas = normalized.lecturas.filter(item => {
-      const varName = String(item.variable || item.name || '').toLowerCase();
-      // exclude entries containing 'bruta', 'bruto' or 'raw' anywhere (handles underscores)
-      return !/(bruta|bruto|raw)/i.test(varName);
-    });
-  }
-
-  const parsedHistory = parseTelemetryHistory(normalized);
-  if (!parsedHistory.timestamps.length) {
-    console.warn('El endpoint remoto no devolvió datos históricos reconocibles.', payload);
-    return false;
-  }
-
-  trendHistory = parsedHistory;
-  // keep raw lecturas for full-history view (one DB row per table row)
-  if (Array.isArray(normalized.lecturas) && normalized.lecturas.length) {
-    trendHistoryRaw = normalized.lecturas.map(l => ({ ...l }));
-  } else {
-    trendHistoryRaw = [];
-  }
-  saveChartHistory();
-
-  const isDbLecturas = !!(normalized && Array.isArray(normalized.lecturas) && normalized.lecturas.length);
-  if (foundPath && /lecturas|telemetria|historial|records|registros/.test(foundPath) || isDbLecturas) {
-    // Production-friendly message for DB-backed history
-    document.getElementById('history-source').innerText = 'Historial (Producción) — origen: Base de Datos (lecturas)';
-  } else {
-    document.getElementById('history-source').innerText = foundPath ? `Mostrando historial remoto desde ${foundPath}` : 'Mostrando historial remoto';
-  }
-
-  renderHistoryTable();
-
-  return true;
-}
-
-async function debugTelemetryHistory() {
-  if (!token || !device) {
-    console.warn('No hay token o device disponibles para la depuración. Inicia sesión primero.');
-    return;
-  }
-
-  const paths = [
-    `/api/dispositivo/${device}/actual`,
-    `/api/dispositivo/${device}/telemetria`,
-    `/api/dispositivo/${device}/historial`,
-    `/api/dispositivo/${device}/lecturas`,
-    `/api/dispositivo/${device}/historico`,
-    `/api/dispositivo/${device}/datos`,
-    `/api/dispositivo/${device}/history`,
-    `/api/dispositivo/${device}/telemetry`,
-    `/api/dispositivo/${device}/mediciones`,
-    `/api/dispositivo/${device}/measurements`,
-    `/api/dispositivo/${device}/registro`,
-    `/api/dispositivo/${device}/records`,
-    `/api/dispositivo/${device}`
-  ];
-
-  for (const path of paths) {
-    try {
-      console.info('Solicitando historial desde', API_URL + path);
-      const response = await fetch(API_URL + path, {
-        headers: { Authorization: 'Bearer ' + token }
-      });
-
-      console.info('Respuesta', response.status, response.statusText);
-      const payload = await response.json();
-      console.log('Payload histórico desde', path, payload);
-      if (response.ok && payload) return payload;
-    } catch (error) {
-      console.error('Error al solicitar historial desde', path, error);
-    }
-  }
-
-  console.warn('No se pudo obtener historial desde ninguno de los endpoints previstos.');
-}
-
-window.debugTelemetryHistory = debugTelemetryHistory;
+// ── CHART ─────────────────────────────────────────────────────────────────────
 
 function formatTimestamp(timestamp) {
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString('es-CL', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'America/Santiago'
+  return new Date(timestamp).toLocaleTimeString('es-CL', {
+    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Santiago'
   });
 }
 
 function updateTrendChartData() {
   if (!trendChart) return;
-
-  trendChart.data.labels = trendHistory.timestamps.map(formatTimestamp);
-  trendChart.data.datasets[0].data = trendHistory.temperatura;
-  trendChart.data.datasets[1].data = trendHistory.humedad_aire;
-  trendChart.data.datasets[2].data = trendHistory.humedad_tierra;
+  trendChart.data.labels                   = trendHistory.timestamps.map(formatTimestamp);
+  trendChart.data.datasets[0].data         = trendHistory.temperatura;
+  trendChart.data.datasets[1].data         = trendHistory.humedad_aire;
+  trendChart.data.datasets[2].data         = trendHistory.humedad_tierra;
   trendChart.update();
 }
 
@@ -475,7 +251,7 @@ function createTrendChart() {
   const canvasEl = document.getElementById('trend-chart');
   if (!canvasEl) return;
   const ctx = canvasEl.getContext('2d');
-  if (trendChart) trendChart.destroy();
+  if (trendChart) { trendChart.destroy(); trendChart = null; }
 
   trendChart = new Chart(ctx, {
     type: 'line',
@@ -485,111 +261,97 @@ function createTrendChart() {
         {
           label: 'Temperatura',
           data: trendHistory.temperatura,
-          borderColor: '#fb7185',
-          backgroundColor: 'rgba(251, 113, 133, 0.18)',
-          tension: 0.2,
-          fill: false,
-          pointRadius: 3
+          borderColor: '#f4a261',
+          backgroundColor: 'rgba(244,162,97,0.12)',
+          tension: 0.35, fill: false, pointRadius: 2, borderWidth: 2
         },
         {
-          label: 'Humedad de aire',
+          label: 'Humedad aire',
           data: trendHistory.humedad_aire,
-          borderColor: '#38bdf8',
-          backgroundColor: 'rgba(56, 189, 248, 0.18)',
-          tension: 0.2,
-          fill: false,
-          pointRadius: 3
+          borderColor: '#90e0ef',
+          backgroundColor: 'rgba(144,224,239,0.12)',
+          tension: 0.35, fill: false, pointRadius: 2, borderWidth: 2
         },
         {
-          label: 'Humedad de tierra',
+          label: 'Humedad tierra',
           data: trendHistory.humedad_tierra,
-          borderColor: '#34d399',
-          backgroundColor: 'rgba(52, 211, 153, 0.18)',
-          tension: 0.2,
-          fill: false,
-          pointRadius: 3
+          borderColor: '#40916c',
+          backgroundColor: 'rgba(64,145,108,0.12)',
+          tension: 0.35, fill: false, pointRadius: 2, borderWidth: 2
         }
       ]
     },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 2.8,
+      // ── BUG FIX: maintainAspectRatio=false para que el canvas use
+      //    la altura del contenedor .chart-wrap en lugar de calcularla
+      maintainAspectRatio: false,
       plugins: {
-        legend: { display: true, labels: { color: '#e2e8f0', usePointStyle: true, pointStyle: 'circle' } },
+        legend: { display: false } // leyenda propia en HTML
       },
       scales: {
-        x: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148,163,184,0.15)' } },
-        y: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148,163,184,0.15)' } }
+        x: {
+          ticks: { color: '#8a7e72', font: { size: 11 }, maxTicksLimit: 10 },
+          grid:  { color: 'rgba(221,213,200,0.5)' }
+        },
+        y: {
+          ticks: { color: '#8a7e72', font: { size: 11 } },
+          grid:  { color: 'rgba(221,213,200,0.5)' }
+        }
       }
     }
   });
 }
 
-function formatDateCL(timestamp) {
-  const d = new Date(timestamp);
-  return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Santiago' });
+// ── HISTORY TABLE ─────────────────────────────────────────────────────────────
+
+function formatDateCL(ts) {
+  return new Date(ts).toLocaleDateString('es-CL',
+    { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Santiago' });
 }
 
-function formatTimeCL(timestamp) {
-  const d = new Date(timestamp);
-  return d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Santiago' });
+function formatTimeCL(ts) {
+  return new Date(ts).toLocaleTimeString('es-CL',
+    { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Santiago' });
 }
 
 function renderHistoryTable(filter = { type: 'all' }) {
-  console.info('renderHistoryTable filter:', filter);
   const tbody = document.getElementById('history-tbody');
   if (!tbody) return;
 
   const rows = [];
 
-  // If we have raw DB rows, aggregate them by minute so each timestamp row shows the three variables
   if (Array.isArray(trendHistoryRaw) && trendHistoryRaw.length) {
     const points = {};
     for (const lectura of trendHistoryRaw) {
       const rawTs = lectura.fecha || lectura.date || lectura.timestamp || lectura.created_at || lectura.updated_at;
       const tsObj = new Date(rawTs);
       if (Number.isNaN(tsObj.getTime())) continue;
-      // group by minute (ignore seconds)
       tsObj.setSeconds(0, 0);
       const ts = tsObj.toISOString();
-      if (!points[ts]) points[ts] = { temperatura: null, humedad_aire: null, humedad_tierra: null, count: 0 };
-
-      const varKey = normalizeVariableName(lectura.variable || lectura.name || lectura.tipo || lectura.sensor || lectura.nombre || lectura.key || '');
+      if (!points[ts]) points[ts] = { temperatura: null, humedad_aire: null, humedad_tierra: null };
+      const varKey = normalizeVariableName(
+        lectura.variable || lectura.name || lectura.tipo || lectura.sensor || lectura.nombre || lectura.key || ''
+      );
       const val = normalizeValue(lectura.valor ?? lectura.value ?? lectura.reading ?? lectura.medida ?? lectura.data ?? lectura.val);
-      if (!Number.isNaN(val) && varKey) {
-        points[ts][varKey] = val;
-      }
-      points[ts].count += 1;
+      if (!Number.isNaN(val) && varKey) points[ts][varKey] = val;
     }
-
-    const sortedTs = Object.keys(points).sort();
-    for (const ts of sortedTs) {
-      rows.push({
-        timestamp: ts,
-        date: formatDateCL(ts),
-        time: formatTimeCL(ts),
-        tierra: points[ts].humedad_tierra,
-        temperatura: points[ts].temperatura,
-        humedad_aire: points[ts].humedad_aire,
-        _count: points[ts].count
-      });
+    for (const ts of Object.keys(points).sort()) {
+      rows.push({ timestamp: ts, date: formatDateCL(ts), time: formatTimeCL(ts), ...points[ts] });
     }
   } else {
     for (let i = 0; i < trendHistory.timestamps.length; i++) {
       const ts = trendHistory.timestamps[i];
       rows.push({
-        timestamp: ts,
-        date: formatDateCL(ts),
-        time: formatTimeCL(ts),
-        tierra: trendHistory.humedad_tierra[i],
-        temperatura: trendHistory.temperatura[i],
-        humedad_aire: trendHistory.humedad_aire[i]
+        timestamp: ts, date: formatDateCL(ts), time: formatTimeCL(ts),
+        humedad_tierra: trendHistory.humedad_tierra[i],
+        temperatura:    trendHistory.temperatura[i],
+        humedad_aire:   trendHistory.humedad_aire[i]
       });
     }
   }
 
-  // Apply filter
+  // Aplicar filtro
   const now = new Date();
   let filtered = rows;
   if (filter.type === 'last3') {
@@ -597,28 +359,21 @@ function renderHistoryTable(filter = { type: 'all' }) {
     filtered = rows.filter(r => new Date(r.timestamp) >= cutoff);
   } else if (filter.type === 'today') {
     const todayStr = now.toLocaleDateString('es-CL', { timeZone: 'America/Santiago' });
-    console.info('Filtrando por hoy:', todayStr, 'rows total', rows.length);
     filtered = rows.filter(r => r.date === todayStr);
   } else if (filter.type === 'custom' && filter.date) {
-    const dateBase = filter.date; // YYYY-MM-DD
-    const targetDateStr = new Date(dateBase + 'T00:00:00').toLocaleDateString('es-CL', { timeZone: 'America/Santiago' });
-    console.info('Filtrando custom por fecha', dateBase, '→', targetDateStr, 'from/to', filter.from, filter.to);
+    const targetStr = new Date(filter.date + 'T00:00:00').toLocaleDateString('es-CL', { timeZone: 'America/Santiago' });
     if (filter.from && filter.to) {
-      const fromTs = new Date(dateBase + 'T' + filter.from + ':00');
-      const toTs = new Date(dateBase + 'T' + filter.to + ':00');
-      filtered = rows.filter(r => {
-        const t = new Date(r.timestamp);
-        return t >= fromTs && t <= toTs;
-      });
+      const fromTs = new Date(filter.date + 'T' + filter.from + ':00');
+      const toTs   = new Date(filter.date + 'T' + filter.to   + ':00');
+      filtered = rows.filter(r => { const t = new Date(r.timestamp); return t >= fromTs && t <= toTs; });
     } else {
-      filtered = rows.filter(r => r.date === targetDateStr);
+      filtered = rows.filter(r => r.date === targetStr);
     }
   }
 
-  // Build table
   tbody.innerHTML = '';
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;color:#94a3b8;text-align:center;">No hay datos para el filtro seleccionado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:18px;color:var(--muted);text-align:center;">Sin datos para el filtro seleccionado.</td></tr>';
     return;
   }
 
@@ -626,317 +381,268 @@ function renderHistoryTable(filter = { type: 'all' }) {
   for (const r of filtered) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td data-label="Fecha" style="padding:8px 12px;border-top:1px solid rgba(148,163,184,0.06);">${r.date}</td>
-      <td data-label="Hora" style="padding:8px 12px;border-top:1px solid rgba(148,163,184,0.06);">${r.time}</td>
-      <td data-label="Tierra 🌱" style="padding:8px 12px;border-top:1px solid rgba(148,163,184,0.06);">${r.tierra ?? '--'}</td>
-      <td data-label="Temperatura ☀️" style="padding:8px 12px;border-top:1px solid rgba(148,163,184,0.06);">${r.temperatura ?? '--'}</td>
-      <td data-label="Humedad aire ☁️" style="padding:8px 12px;border-top:1px solid rgba(148,163,184,0.06);">${r.humedad_aire ?? '--'}</td>
+      <td data-label="Fecha">${r.date}</td>
+      <td data-label="Hora">${r.time}</td>
+      <td data-label="🌱 Tierra">${r.humedad_tierra ?? '—'}</td>
+      <td data-label="☀️ Temperatura">${r.temperatura ?? '—'}</td>
+      <td data-label="☁️ Humedad aire">${r.humedad_aire ?? '—'}</td>
     `;
     tbody.appendChild(tr);
   }
 }
 
 function applyHistoryFilterFromUI() {
-  const sel = document.getElementById('history-filter');
+  const sel  = document.getElementById('history-filter');
   const type = sel ? sel.value : 'all';
   const date = document.getElementById('filter-date')?.value;
   const from = document.getElementById('filter-from')?.value;
-  const to = document.getElementById('filter-to')?.value;
+  const to   = document.getElementById('filter-to')?.value;
   const filter = { type };
   if (date) filter.date = date;
   if (from) filter.from = from;
-  if (to) filter.to = to;
-  console.info('Aplicando filtro desde UI', filter);
+  if (to)   filter.to   = to;
   renderHistoryTable(filter);
 }
 
 function setupHistoryFilterUI() {
-  const sel = document.getElementById('history-filter');
+  const sel    = document.getElementById('history-filter');
   const dateEl = document.getElementById('filter-date');
   const fromEl = document.getElementById('filter-from');
-  const toEl = document.getElementById('filter-to');
+  const toEl   = document.getElementById('filter-to');
   const applyBtn = document.getElementById('filter-apply');
   const resetBtn = document.getElementById('filter-reset');
-
   if (!sel) return;
-  sel.addEventListener('change', () => {
-    const v = sel.value;
-    // Only show date/time inputs for custom ranges
-    dateEl.style.display = v === 'custom' ? 'inline-block' : 'none';
-    fromEl.style.display = v === 'custom' ? 'inline-block' : 'none';
-    toEl.style.display = v === 'custom' ? 'inline-block' : 'none';
-  });
+
+  const toggleCustom = v => {
+    const show = v === 'custom';
+    dateEl.style.display = show ? 'inline-block' : 'none';
+    fromEl.style.display = show ? 'inline-block' : 'none';
+    toEl.style.display   = show ? 'inline-block' : 'none';
+  };
+
+  sel.addEventListener('change', () => toggleCustom(sel.value));
   applyBtn?.addEventListener('click', applyHistoryFilterFromUI);
   resetBtn?.addEventListener('click', () => {
-    sel.value = 'all';
+    sel.value    = 'all';
     dateEl.value = '';
     fromEl.value = '';
-    toEl.value = '';
-    dateEl.style.display = 'none';
-    fromEl.style.display = 'none';
-    toEl.style.display = 'none';
+    toEl.value   = '';
+    toggleCustom('all');
     renderHistoryTable({ type: 'all' });
   });
 }
 
-// Mostrar errores en formulario
-function showError(inputId, message) {
-  const input = document.getElementById(inputId);
-  const errorDiv = input.nextElementSibling;
-  
-  if (message) {
-    input.classList.add('error');
-    errorDiv.textContent = message;
-    errorDiv.classList.add('show');
+// ── UI HELPERS ────────────────────────────────────────────────────────────────
+
+// ── BUG FIX: showTab usa currentTarget para obtener el botón,
+//    no event.target que podría ser un nodo hijo
+function showTab(event, tabName) {
+  document.querySelectorAll('.form-content').forEach(f => f.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabName).classList.add('active');
+  // currentTarget es siempre el elemento al que está unido el listener (el botón)
+  const btn = event.currentTarget || event.target;
+  btn.classList.add('active');
+  clearErrors();
+  document.getElementById('admin-success')?.classList.remove('show');
+}
+
+function setButtonLoading(buttonId, isLoading) {
+  const btn = document.getElementById(buttonId);
+  if (!btn) return;
+  btn.disabled = isLoading;
+  if (isLoading) {
+    btn.innerHTML = '<span class="spinner"></span> Cargando...';
   } else {
-    input.classList.remove('error');
-    errorDiv.classList.remove('show');
+    const labels = { 'login-btn': 'Entrar', 'reg-btn': 'Crear cuenta', 'admin-btn': 'Registrar dispositivo' };
+    btn.innerHTML = labels[buttonId] || 'Aceptar';
   }
 }
 
-// Limpiar errores
-function clearErrors() {
-  document.querySelectorAll('.error-msg').forEach(msg => {
-    msg.classList.remove('show');
-  });
-  document.querySelectorAll('input').forEach(input => {
+function showError(inputId, message) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const errorDiv = input.nextElementSibling;
+  if (message) {
+    input.classList.add('error');
+    if (errorDiv) { errorDiv.textContent = message; errorDiv.classList.add('show'); }
+  } else {
     input.classList.remove('error');
-  });
+    if (errorDiv) errorDiv.classList.remove('show');
+  }
 }
 
-// Login
+function clearErrors() {
+  document.querySelectorAll('.error-msg').forEach(m => m.classList.remove('show'));
+  document.querySelectorAll('input').forEach(i => i.classList.remove('error'));
+}
+
+// ── AUTH FLOWS ────────────────────────────────────────────────────────────────
+
 async function doLogin(event) {
   event.preventDefault();
   clearErrors();
-  
-  const user = document.getElementById("login-user").value.trim();
-  const pass = document.getElementById("login-pass").value.trim();
-  
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value.trim();
   if (!user) { showError('login-user', 'El usuario es requerido'); return; }
   if (!pass) { showError('login-pass', 'La contraseña es requerida'); return; }
-  
   setButtonLoading('login-btn', true);
-  
   try {
-    const response = await fetch(API_URL + "/api/auth/login", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
+    const response = await fetch(API_URL + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ username: user, password: pass })
     });
-
     const data = await response.json();
-    
-    if (!response.ok) {
-      const errorMsg = data.message || data.error || `Error ${response.status}`;
-      showError('login-user', errorMsg);
-      setButtonLoading('login-btn', false);
-      return;
-    }
-    
-    if (!data.token) {
-      showError('login-user', 'Usuario o contraseña incorrectos');
-      setButtonLoading('login-btn', false);
-      return;
-    }
-
-    token = data.token;
+    if (!response.ok) { showError('login-user', data.message || data.error || `Error ${response.status}`); setButtonLoading('login-btn', false); return; }
+    if (!data.token)  { showError('login-user', 'Usuario o contraseña incorrectos'); setButtonLoading('login-btn', false); return; }
+    token  = data.token;
     device = data.dispositivo_id;
-
-    localStorage.setItem("token", token);
-    localStorage.setItem("device", device);
-
+    try { localStorage.setItem('token', token); localStorage.setItem('device', device); } catch (_) {}
     showDashboard();
     startAutoRefresh();
-  } catch (error) {
-    console.error('Error de login:', error);
+  } catch (e) {
+    console.error('Error de login:', e);
     showError('login-user', 'No se pudo conectar con el servidor.');
     setButtonLoading('login-btn', false);
   }
 }
 
-// Registro de Usuario Final
 async function doRegister(event) {
   event.preventDefault();
   clearErrors();
-  
-  const user = document.getElementById("reg-user").value.trim();
-  const pass = document.getElementById("reg-pass").value.trim();
-  const deviceId = document.getElementById("reg-device").value.trim();
-  const token_auth = document.getElementById("reg-token").value.trim();
-  
-  if (!user) { showError('reg-user', 'El usuario es requerido'); return; }
-  if (!validateInput(pass, 'password')) { showError('reg-pass', 'La contraseña debe tener al menos 6 caracteres'); return; }
-  if (!deviceId) { showError('reg-device', 'El ID del dispositivo es requerido'); return; }
-  if (!token_auth) { showError('reg-token', 'El token es requerido'); return; }
-  
+  const user      = document.getElementById('reg-user').value.trim();
+  const pass      = document.getElementById('reg-pass').value.trim();
+  const deviceId  = document.getElementById('reg-device').value.trim();
+  const tokenAuth = document.getElementById('reg-token').value.trim();
+  if (!user)                               { showError('reg-user',   'El usuario es requerido'); return; }
+  if (!validateInput(pass, 'password'))    { showError('reg-pass',   'La contraseña debe tener al menos 6 caracteres'); return; }
+  if (!deviceId)                           { showError('reg-device', 'El ID del dispositivo es requerido'); return; }
+  if (!tokenAuth)                          { showError('reg-token',  'El token es requerido'); return; }
   setButtonLoading('reg-btn', true);
-  
   try {
-    const response = await fetch(API_URL + "/api/auth/register", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({
-        username: user,
-        password: pass,
-        dispositivo_id: deviceId,
-        auth_token: token_auth
-      })
+    const response = await fetch(API_URL + '/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass, dispositivo_id: deviceId, auth_token: tokenAuth })
     });
-
     const data = await response.json();
-    
-    if (!response.ok) {
-      const errorMsg = data.message || data.error || `Error ${response.status}`;
-      showError('reg-user', errorMsg);
-      setButtonLoading('reg-btn', false);
-      return;
-    }
-
-    token = data.token;
+    if (!response.ok) { showError('reg-user', data.message || data.error || `Error ${response.status}`); setButtonLoading('reg-btn', false); return; }
+    token  = data.token;
     device = data.dispositivo_id;
-
-    localStorage.setItem("token", token);
-    localStorage.setItem("device", device);
-
+    try { localStorage.setItem('token', token); localStorage.setItem('device', device); } catch (_) {}
     showDashboard();
     startAutoRefresh();
-  } catch (error) {
-    console.error('Error de registro:', error);
+  } catch (e) {
+    console.error('Error de registro:', e);
     showError('reg-user', 'No se pudo conectar con el servidor.');
     setButtonLoading('reg-btn', false);
   }
 }
 
-// EXCLUSIVO ADMIN: Alta de Dispositivos en Fábrica
 async function doAdminRegisterDevice(event) {
   event.preventDefault();
   clearErrors();
-  
-  const adminKey = document.getElementById("admin-master-key").value.trim();
-  const newDevice = document.getElementById("admin-device-id").value.trim();
-  const newToken = document.getElementById("admin-device-token").value.trim();
-  const successBox = document.getElementById("admin-success");
-  
+  const adminKey  = document.getElementById('admin-master-key').value.trim();
+  const newDevice = document.getElementById('admin-device-id').value.trim();
+  const newToken  = document.getElementById('admin-device-token').value.trim();
+  const successBox = document.getElementById('admin-success');
   successBox.classList.remove('show');
-
-  if (!adminKey) { showError('admin-master-key', 'La clave de administrador es mandatoria'); return; }
-  if (!newDevice) { showError('admin-device-id', 'Ingresa el ID que llevará el ESP32'); return; }
-  if (!newToken) { showError('admin-device-token', 'Asigna un token seguro para la etiqueta'); return; }
-
+  if (!adminKey)  { showError('admin-master-key',  'La clave de administrador es obligatoria'); return; }
+  if (!newDevice) { showError('admin-device-id',   'Ingresa el ID del dispositivo'); return; }
+  if (!newToken)  { showError('admin-device-token', 'Asigna un token al dispositivo'); return; }
   setButtonLoading('admin-btn', true);
-
   try {
-    // Apuntamos al endpoint administrativo de tu API Node.js
-    const response = await fetch(API_URL + "/api/admin/dispositivos", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({
-        admin_key: adminKey,
-        dispositivo_id: newDevice,
-        auth_token: newToken
-      })
+    const response = await fetch(API_URL + '/api/admin/dispositivos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ admin_key: adminKey, dispositivo_id: newDevice, auth_token: newToken })
     });
-
     const data = await response.json();
-
-    if (!response.ok) {
-      const errorMsg = data.message || data.error || 'Clave inválida o error en servidor';
-      showError('admin-master-key', errorMsg);
-      setButtonLoading('admin-btn', false);
-      return;
-    }
-
-    // Éxito: Informamos en pantalla y limpiamos campos de equipo
-    successBox.innerHTML = `<strong>¡Equipo Pre-Registrado!</strong><br>ID: ${newDevice}<br>Token: ${newToken}<br>Listo para empaquetar y etiquetar.`;
+    if (!response.ok) { showError('admin-master-key', data.message || data.error || 'Clave inválida o error en servidor'); setButtonLoading('admin-btn', false); return; }
+    successBox.innerHTML = `<strong>¡Equipo registrado!</strong><br>ID: ${newDevice}<br>Token: ${newToken}`;
     successBox.classList.add('show');
-
-    document.getElementById("admin-device-id").value = "";
-    document.getElementById("admin-device-token").value = "";
+    document.getElementById('admin-device-id').value    = '';
+    document.getElementById('admin-device-token').value = '';
     setButtonLoading('admin-btn', false);
-
-  } catch (error) {
-    console.error('Error de administración:', error);
-    showError('admin-master-key', 'Error de red al conectar con la ruta de administración.');
+  } catch (e) {
+    console.error('Error admin:', e);
+    showError('admin-master-key', 'Error de red al conectar con el servidor.');
     setButtonLoading('admin-btn', false);
   }
 }
 
-// Mostrar dashboard
+// ── DASHBOARD VISIBILITY ──────────────────────────────────────────────────────
+
 function showDashboard() {
-  document.getElementById("auth").style.display = "none";
-  document.getElementById("dash").style.display = "block";
+  document.getElementById('auth').style.display = 'none';
+  document.getElementById('dash').style.display = 'block';
 }
 
-// Ocultar dashboard
 function hideDashboard() {
-  document.getElementById("auth").style.display = "block";
-  document.getElementById("dash").style.display = "none";
+  document.getElementById('auth').style.display = '';
+  document.getElementById('dash').style.display = 'none';
 }
 
-// Cargar datos del dispositivo
+// ── DATA LOADING ──────────────────────────────────────────────────────────────
+
 async function load() {
   try {
-    if (!trendHistory.timestamps.length) {
-      trendHistory = loadChartHistory();
-    }
+    if (!trendHistory.timestamps.length) trendHistory = loadChartHistory();
 
-    const response = await fetch(API_URL + "/api/dispositivo/" + device + "/actual", {
-      headers: {
-        "Authorization": "Bearer " + token
-      }
+    const response = await fetch(`${API_URL}/api/dispositivo/${device}/actual`, {
+      headers: { Authorization: 'Bearer ' + token }
     });
-
     if (!response.ok) {
       if (response.status === 401) { logout(); return; }
       throw new Error('Error al cargar datos');
     }
 
     const data = await response.json();
-    const deviceName = data.dispositivo_id || "Dispositivo";
-    document.getElementById("device").innerText = deviceName;
 
-    const sensorStatus = document.getElementById("sensor-status");
-    if (data.online) {
-      document.getElementById("status").textContent = "ONLINE";
-      document.getElementById("status").className = "status-badge status-online";
-      document.getElementById("status-meta").innerText = "Sensor activo y recolectando datos";
-      sensorStatus.innerText = "Activo";
+    // Device name
+    const deviceName = data.dispositivo_id || device || 'Dispositivo';
+    document.getElementById('device').innerText       = deviceName;
+    document.getElementById('main-title').innerText   = deviceName;
+
+    // Sidebar & status badge
+    const isOnline = !!data.online;
+    const dot = document.getElementById('sidebar-dot');
+    const statusBadge = document.getElementById('status');
+
+    if (isOnline) {
+      statusBadge.textContent    = 'ONLINE';
+      statusBadge.className      = 'status-badge status-online';
+      document.getElementById('status-meta').innerText   = 'Sensor activo — recolectando datos';
+      document.getElementById('sensor-status').innerText = 'Activo';
+      document.getElementById('sidebar-status-text').innerText = 'Online';
+      if (dot) { dot.className = 'status-dot online'; }
     } else {
-      document.getElementById("status").textContent = "OFFLINE";
-      document.getElementById("status").className = "status-badge status-offline";
-      document.getElementById("status-meta").innerText = "Sin conexión. Esperando actualización";
-      sensorStatus.innerText = "Offline";
+      statusBadge.textContent    = 'OFFLINE';
+      statusBadge.className      = 'status-badge status-offline';
+      document.getElementById('status-meta').innerText   = 'Sin conexión — esperando actualización';
+      document.getElementById('sensor-status').innerText = 'Offline';
+      document.getElementById('sidebar-status-text').innerText = 'Offline';
+      if (dot) { dot.className = 'status-dot offline'; }
     }
 
-    const sensorTimestamp = parseSensorTimestamp(data) || new Date().toISOString();
-    const lastUpdate = new Date(sensorTimestamp).toLocaleString('es-CL', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-      timeZone: 'America/Santiago'
+    // Last update
+    const sensorTs = parseSensorTimestamp(data) || new Date().toISOString();
+    document.getElementById('last-update').innerText = new Date(sensorTs).toLocaleString('es-CL', {
+      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Santiago'
     });
-    document.getElementById("last-update").innerText = lastUpdate;
 
+    // Readings grid
     const readings = Array.isArray(data.lecturas) ? data.lecturas : [];
-    const filteredReadings = readings.filter(lectura => !/tierra[_\s]*bruta|tierra[_\s]*burta/i.test(String(lectura.variable || '')));
-    const grid = document.getElementById("grid");
-    grid.innerHTML = "";
+    const filteredReadings = readings.filter(l => !/tierra[_\s]*bruta|tierra[_\s]*burta/i.test(String(l.variable || '')));
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
 
-    if (filteredReadings.length > 0) {
+    if (filteredReadings.length) {
       filteredReadings.forEach(lectura => {
-        const card = document.createElement("div");
-        card.className = "reading-card";
+        const card = document.createElement('div');
+        const cssClass = variableCardClass(lectura.variable);
+        card.className = `reading-card ${cssClass}`;
         const emoji = variableEmoji(lectura.variable);
         card.innerHTML = `
           <div class="reading-label">${emoji} ${lectura.variable}</div>
@@ -945,34 +651,29 @@ async function load() {
         grid.appendChild(card);
       });
     } else {
-      grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #94a3b8; padding: 28px;">No hay lecturas disponibles en este momento.</div>';
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:28px;">Sin lecturas disponibles.</div>';
     }
 
+    // Append to trend history
     trendHistory = loadChartHistory();
     const timestamp = parseSensorTimestamp(data) || new Date().toISOString();
-    const currentValues = {
-      temperatura: NaN,
-      humedad_aire: NaN,
-      humedad_tierra: NaN
-    };
-
-    filteredReadings.forEach(lectura => {
-      const key = normalizeVariableName(lectura.variable);
-      if (key) {
-        currentValues[key] = normalizeValue(lectura.valor);
-      }
+    const current = { temperatura: NaN, humedad_aire: NaN, humedad_tierra: NaN };
+    filteredReadings.forEach(l => {
+      const key = normalizeVariableName(l.variable);
+      if (key) current[key] = normalizeValue(l.valor);
     });
 
-    if (!trendHistory.timestamps.length || trendHistory.timestamps[trendHistory.timestamps.length - 1] !== timestamp) {
+    const lastTs = trendHistory.timestamps[trendHistory.timestamps.length - 1];
+    if (!lastTs || lastTs !== timestamp) {
       trendHistory.timestamps.push(timestamp);
-      trendHistory.temperatura.push(Number.isNaN(currentValues.temperatura) ? null : currentValues.temperatura);
-      trendHistory.humedad_aire.push(Number.isNaN(currentValues.humedad_aire) ? null : currentValues.humedad_aire);
-      trendHistory.humedad_tierra.push(Number.isNaN(currentValues.humedad_tierra) ? null : currentValues.humedad_tierra);
+      trendHistory.temperatura.push(   Number.isNaN(current.temperatura)    ? null : current.temperatura);
+      trendHistory.humedad_aire.push(  Number.isNaN(current.humedad_aire)   ? null : current.humedad_aire);
+      trendHistory.humedad_tierra.push(Number.isNaN(current.humedad_tierra) ? null : current.humedad_tierra);
     } else {
-      const lastIndex = trendHistory.timestamps.length - 1;
-      trendHistory.temperatura[lastIndex] = Number.isNaN(currentValues.temperatura) ? trendHistory.temperatura[lastIndex] : currentValues.temperatura;
-      trendHistory.humedad_aire[lastIndex] = Number.isNaN(currentValues.humedad_aire) ? trendHistory.humedad_aire[lastIndex] : currentValues.humedad_aire;
-      trendHistory.humedad_tierra[lastIndex] = Number.isNaN(currentValues.humedad_tierra) ? trendHistory.humedad_tierra[lastIndex] : currentValues.humedad_tierra;
+      const i = trendHistory.timestamps.length - 1;
+      if (!Number.isNaN(current.temperatura))    trendHistory.temperatura[i]    = current.temperatura;
+      if (!Number.isNaN(current.humedad_aire))   trendHistory.humedad_aire[i]   = current.humedad_aire;
+      if (!Number.isNaN(current.humedad_tierra)) trendHistory.humedad_tierra[i] = current.humedad_tierra;
     }
 
     while (trendHistory.timestamps.length > 96) {
@@ -983,66 +684,219 @@ async function load() {
     }
 
     saveChartHistory();
-
-    if (!trendChart) {
-      createTrendChart();
-    }
+    if (!trendChart) createTrendChart();
     updateTrendChartData();
+
   } catch (error) {
     console.error('Error al cargar datos:', error);
-    document.getElementById("status").textContent = "ERROR";
-    document.getElementById("status").className = "status-badge status-offline";
-    document.getElementById("status-meta").innerText = "No se pudieron obtener datos del sensor";
-    document.getElementById("sensor-status").innerText = "Error";
+    document.getElementById('status').textContent = 'ERROR';
+    document.getElementById('status').className   = 'status-badge status-offline';
+    document.getElementById('status-meta').innerText   = 'No se pudieron obtener datos del sensor';
+    document.getElementById('sensor-status').innerText = 'Error';
+    const dot = document.getElementById('sidebar-dot');
+    if (dot) dot.className = 'status-dot offline';
   }
 }
+
+async function loadHistoricalData() {
+  if (!token || !device) return false;
+
+  async function fetchAllLecturas() {
+    const all = [];
+    const pageSize = 1000;
+    let offset = 0;
+    try {
+      while (true) {
+        const url = `${API_URL}/api/lecturas?dispositivo=${encodeURIComponent(device)}&limit=${pageSize}&offset=${offset}`;
+        const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+        if (!resp.ok) {
+          const resp2 = await fetch(`${API_URL}/api/lecturas`, { headers: { Authorization: 'Bearer ' + token } });
+          if (!resp2.ok) return null;
+          const body2 = await resp2.json();
+          if (Array.isArray(body2)) return body2;
+          if (Array.isArray(body2.lecturas)) return body2.lecturas;
+          return null;
+        }
+        const body = await resp.json();
+        let pageRows = [];
+        if (Array.isArray(body)) pageRows = body;
+        else if (Array.isArray(body.lecturas)) pageRows = body.lecturas;
+        else if (Array.isArray(body.rows))     pageRows = body.rows;
+        else break;
+        if (!pageRows.length) break;
+        all.push(...pageRows.filter(r => !r.dispositivo_id || r.dispositivo_id === device));
+        if (pageRows.length < pageSize) break;
+        offset += pageSize;
+      }
+      return all.length ? all : null;
+    } catch (e) {
+      console.warn('Error en /api/lecturas paginado', e);
+      return null;
+    }
+  }
+
+  let payload = null, foundPath = null;
+
+  try {
+    const lecturasAll = await fetchAllLecturas();
+    if (Array.isArray(lecturasAll) && lecturasAll.length) {
+      payload   = { lecturas: lecturasAll };
+      foundPath = '/api/lecturas';
+    }
+  } catch (e) { console.warn('Error intentando /api/lecturas:', e); }
+
+  if (!payload) {
+    const paths = [
+      `/api/dispositivo/${device}/actual`,
+      `/api/dispositivo/${device}/telemetria`,
+      `/api/dispositivo/${device}/historial`,
+      `/api/dispositivo/${device}/lecturas`,
+      `/api/dispositivo/${device}/historico`,
+      `/api/dispositivo/${device}/datos`,
+      `/api/dispositivo/${device}/history`,
+      `/api/dispositivo/${device}/telemetry`,
+      `/api/dispositivo/${device}/mediciones`,
+      `/api/dispositivo/${device}/measurements`,
+      `/api/dispositivo/${device}/registro`,
+      `/api/dispositivo/${device}/records`,
+      `/api/lecturas?dispositivo=${device}`,
+      `/api/telemetria?dispositivo=${device}`,
+      `/api/historial?dispositivo=${device}`,
+      `/api/records?dispositivo=${device}`,
+      `/api/dispositivo?dispositivo=${device}`,
+      `/api/dispositivo/${device}`
+    ];
+    for (const path of paths) {
+      try {
+        const response = await fetch(API_URL + path, { headers: { Authorization: 'Bearer ' + token } });
+        if (response.status === 401) { logout(); return false; }
+        if (!response.ok) continue;
+        payload = await response.json();
+        foundPath = path;
+        if (payload) break;
+      } catch { continue; }
+    }
+  }
+
+  if (!payload) return false;
+
+  let normalized = { lecturas: [] };
+  if (Array.isArray(payload)) {
+    if (payload.length && payload[0] && (payload[0].variable || payload[0].valor || payload[0].fecha || payload[0].date)) {
+      normalized.lecturas = payload.filter(i => !i.dispositivo_id || i.dispositivo_id === device);
+    } else if (payload.length && payload[0] && payload[0].dispositivo_id) {
+      normalized.lecturas = payload.filter(p => p.dispositivo_id === device).flatMap(p => Array.isArray(p.lecturas) ? p.lecturas : []);
+    } else {
+      normalized.lecturas = payload;
+    }
+  } else if (payload && typeof payload === 'object') {
+    if (Array.isArray(payload.lecturas))  normalized.lecturas = payload.lecturas.filter(i => !i.dispositivo_id || i.dispositivo_id === device);
+    else if (Array.isArray(payload.data)) normalized.lecturas = payload.data.filter(i => !i.dispositivo_id || i.dispositivo_id === device);
+    else if (Array.isArray(payload.items)) normalized.lecturas = payload.items.filter(i => !i.dispositivo_id || i.dispositivo_id === device);
+    else {
+      const nested = Object.values(payload).find(v => Array.isArray(v) && v.length && (v[0].variable || v[0].valor || v[0].fecha || v[0].date));
+      if (Array.isArray(nested)) normalized.lecturas = nested.filter(i => !i.dispositivo_id || i.dispositivo_id === device);
+    }
+  }
+
+  if (Array.isArray(normalized.lecturas)) {
+    normalized.lecturas = normalized.lecturas.filter(i => !/(bruta|bruto|raw)/i.test(String(i.variable || i.name || '')));
+  }
+
+  const parsedHistory = parseTelemetryHistory(normalized);
+  if (!parsedHistory.timestamps.length) return false;
+
+  trendHistory    = parsedHistory;
+  trendHistoryRaw = Array.isArray(normalized.lecturas) && normalized.lecturas.length
+    ? normalized.lecturas.map(l => ({ ...l }))
+    : [];
+  saveChartHistory();
+
+  const src = document.getElementById('history-source');
+  if (src) src.innerText = foundPath ? `Fuente: ${foundPath}` : 'Base de datos';
+
+  renderHistoryTable();
+  return true;
+}
+
+function initializeChartFromStorage() {
+  const stored = loadChartHistory();
+  trendHistory    = stored;
+  trendHistoryRaw = Array.isArray(stored.rawLecturas) ? stored.rawLecturas : [];
+  if (!trendHistory.timestamps.length && !trendHistoryRaw.length) return false;
+  renderHistoryTable();
+  return true;
+}
+
+// ── AUTO REFRESH ──────────────────────────────────────────────────────────────
 
 async function startAutoRefresh() {
   initializeChartFromStorage();
   await loadHistoricalData();
   await load();
-
-  if (loadInterval) clearInterval(loadInterval);
+  // ── BUG FIX: limpiar el intervalo anterior Y resetearlo a null antes de crear uno nuevo
+  stopAutoRefresh();
   loadInterval = setInterval(() => {
-    if (token && device) { load(); }
+    if (token && device) load();
   }, AUTO_REFRESH_INTERVAL_MS);
 }
 
 function stopAutoRefresh() {
-  if (loadInterval) clearInterval(loadInterval);
+  if (loadInterval) {
+    clearInterval(loadInterval);
+    loadInterval = null; // ← BUG FIX: resetear para evitar dobles clear
+  }
 }
 
-// Logout
+// ── LOGOUT ────────────────────────────────────────────────────────────────────
+
 function logout() {
   stopAutoRefresh();
-  localStorage.removeItem("token");
-  localStorage.removeItem("device");
+  try { localStorage.removeItem('token'); localStorage.removeItem('device'); } catch (_) {}
   hideDashboard();
   clearErrors();
-  
-  document.getElementById("login-user").value = "";
-  document.getElementById("login-pass").value = "";
-  document.getElementById("reg-user").value = "";
-  document.getElementById("reg-pass").value = "";
-  document.getElementById("reg-device").value = "";
-  document.getElementById("reg-token").value = "";
-  document.getElementById("admin-master-key").value = "";
-  
-  document.getElementById("login").classList.add('active');
-  document.getElementById("register").classList.remove('active');
-  document.getElementById("admin-panel").classList.remove('active');
-  
-  document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
-    if (idx === 0) btn.classList.add('active');
-    else btn.classList.remove('active');
+
+  ['login-user', 'login-pass', 'reg-user', 'reg-pass', 'reg-device', 'reg-token', 'admin-master-key'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
   });
-  
-  token = null;
+
+  // Restablecer tabs
+  document.querySelectorAll('.tab-btn').forEach((b, i) => { b.classList.toggle('active', i === 0); });
+  document.querySelectorAll('.form-content').forEach((f, i) => { f.classList.toggle('active', i === 0); });
+
+  // Destruir gráfico
+  if (trendChart) { trendChart.destroy(); trendChart = null; }
+  trendHistory    = { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
+  trendHistoryRaw = [];
+
+  token  = null;
   device = null;
 }
 
+// ── DEBUG HELPER ──────────────────────────────────────────────────────────────
+
+async function debugTelemetryHistory() {
+  if (!token || !device) { console.warn('No hay sesión activa.'); return; }
+  const paths = [
+    `/api/dispositivo/${device}/actual`, `/api/dispositivo/${device}/telemetria`,
+    `/api/dispositivo/${device}/historial`, `/api/dispositivo/${device}/lecturas`,
+    `/api/dispositivo/${device}`
+  ];
+  for (const path of paths) {
+    try {
+      const r = await fetch(API_URL + path, { headers: { Authorization: 'Bearer ' + token } });
+      const payload = await r.json();
+      console.log('Payload desde', path, payload);
+      if (r.ok && payload) return payload;
+    } catch (e) { console.error('Error en', path, e); }
+  }
+}
+window.debugTelemetryHistory = debugTelemetryHistory;
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+
 document.addEventListener('DOMContentLoaded', () => {
-  initializeChartFromStorage();
   setupHistoryFilterUI();
   if (token && device) {
     showDashboard();
