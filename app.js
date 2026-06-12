@@ -498,18 +498,67 @@ function saveMeasurementInterval() {
   const value = Number(valueEl.value);
   const unit = unitEl.value;
   if (!Number.isFinite(value) || value <= 0) {
-    statusEl.textContent = 'Ingresa un intervalo válido.';
+    statusEl.textContent = '❌ Ingresa un intervalo válido.';
     statusEl.style.color = 'var(--error)';
+    statusEl.style.display = 'block';
     return;
   }
 
-  try {
-    localStorage.setItem('cfg-interval', JSON.stringify({ value, unit }));
-    statusEl.textContent = 'Intervalo guardado.';
-    statusEl.style.color = 'var(--success)';
-  } catch (_) {
-    statusEl.textContent = 'No se pudo guardar el intervalo.';
-    statusEl.style.color = 'var(--error)';
+  // Convertir a segundos para enviar al servidor
+  let intervalSeconds = value;
+  if (unit === 'minutes') intervalSeconds = value * 60;
+  else if (unit === 'hours') intervalSeconds = value * 3600;
+
+  // Intentar enviar al servidor
+  if (token && device) {
+    fetch(`${API_URL}/api/dispositivo/${device}/config`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ measurement_interval: intervalSeconds })
+    })
+      .then(resp => {
+        if (!resp.ok) throw new Error(`Error ${resp.status}`);
+        return resp.json();
+      })
+      .then(data => {
+        statusEl.textContent = '✅ Frecuencia de medición actualizada correctamente.';
+        statusEl.style.color = 'var(--success)';
+        statusEl.style.display = 'block';
+        
+        // Guardar en localStorage como respaldo
+        try {
+          localStorage.setItem('cfg-interval', JSON.stringify({ value, unit, seconds: intervalSeconds }));
+        } catch (_) {}
+        
+        setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
+      })
+      .catch(err => {
+        console.error('Error al guardar intervalo:', err);
+        statusEl.textContent = '❌ No se pudo actualizar. Se guardó localmente.';
+        statusEl.style.color = 'var(--error)';
+        statusEl.style.display = 'block';
+        
+        // Guardar en localStorage como respaldo
+        try {
+          localStorage.setItem('cfg-interval', JSON.stringify({ value, unit, seconds: intervalSeconds }));
+        } catch (_) {}
+      });
+  } else {
+    // Si no hay sesión, solo guardar en localStorage
+    try {
+      localStorage.setItem('cfg-interval', JSON.stringify({ value, unit, seconds: intervalSeconds }));
+      statusEl.textContent = '✅ Intervalo guardado localmente.';
+      statusEl.style.color = 'var(--success)';
+      statusEl.style.display = 'block';
+      setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
+    } catch (_) {
+      statusEl.textContent = '❌ No se pudo guardar el intervalo.';
+      statusEl.style.color = 'var(--error)';
+      statusEl.style.display = 'block';
+    }
   }
 }
 
@@ -532,13 +581,68 @@ function saveThresholds() {
     }
   };
 
-  try {
-    localStorage.setItem('cfg-thresholds', JSON.stringify(thresholds));
-    statusEl.textContent = 'Umbrales guardados.';
-    statusEl.style.color = 'var(--success)';
-  } catch (_) {
-    statusEl.textContent = 'No se pudo guardar los umbrales.';
+  // Validar que al menos uno tenga valores válidos
+  const hasValidThresholds = Object.values(thresholds).some(t => 
+    Number.isFinite(t.min) || Number.isFinite(t.max)
+  );
+
+  if (!hasValidThresholds) {
+    statusEl.textContent = '❌ Ingresa al menos un umbral válido.';
     statusEl.style.color = 'var(--error)';
+    statusEl.style.display = 'block';
+    return;
+  }
+
+  // Intentar enviar al servidor
+  if (token && device) {
+    fetch(`${API_URL}/api/dispositivo/${device}/config`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ thresholds })
+    })
+      .then(resp => {
+        if (!resp.ok) throw new Error(`Error ${resp.status}`);
+        return resp.json();
+      })
+      .then(data => {
+        statusEl.textContent = '✅ Umbrales actualizados correctamente.';
+        statusEl.style.color = 'var(--success)';
+        statusEl.style.display = 'block';
+        
+        // Guardar en localStorage como respaldo
+        try {
+          localStorage.setItem('cfg-thresholds', JSON.stringify(thresholds));
+        } catch (_) {}
+        
+        setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
+      })
+      .catch(err => {
+        console.error('Error al guardar umbrales:', err);
+        statusEl.textContent = '❌ No se pudo actualizar. Se guardó localmente.';
+        statusEl.style.color = 'var(--error)';
+        statusEl.style.display = 'block';
+        
+        // Guardar en localStorage como respaldo
+        try {
+          localStorage.setItem('cfg-thresholds', JSON.stringify(thresholds));
+        } catch (_) {}
+      });
+  } else {
+    // Si no hay sesión, solo guardar en localStorage
+    try {
+      localStorage.setItem('cfg-thresholds', JSON.stringify(thresholds));
+      statusEl.textContent = '✅ Umbrales guardados localmente.';
+      statusEl.style.color = 'var(--success)';
+      statusEl.style.display = 'block';
+      setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
+    } catch (_) {
+      statusEl.textContent = '❌ No se pudo guardar los umbrales.';
+      statusEl.style.color = 'var(--error)';
+      statusEl.style.display = 'block';
+    }
   }
 }
 
@@ -572,12 +676,25 @@ function loadDeviceLogs() {
     })
     .then(data => {
       let lines = [];
-      if (Array.isArray(data)) lines = data;
-      else if (Array.isArray(data.logs)) lines = data.logs;
-      else if (typeof data === 'string') lines = data.split('\n');
-      else if (data && typeof data === 'object') lines = [JSON.stringify(data, null, 2)];
+      
+      if (Array.isArray(data)) {
+        lines = data.map(item => {
+          if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') return String(item);
+          return JSON.stringify(item, null, 2);
+        });
+      } else if (Array.isArray(data.logs)) {
+        lines = data.logs.map(item => {
+          if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') return String(item);
+          return JSON.stringify(item, null, 2);
+        });
+      } else if (typeof data === 'string') {
+        lines = data.split('\n');
+      } else if (data && typeof data === 'object') {
+        lines = [JSON.stringify(data, null, 2)];
+      }
+      
       if (!lines.length) lines = ['No hay logs disponibles.'];
-      consoleEl.innerHTML = lines.map(line => `<div class="log-line">${String(line)}</div>`).join('');
+      consoleEl.innerHTML = lines.map(line => `<div class="log-line">${line}</div>`).join('');
       statusEl.textContent = 'Logs actualizados';
       if (document.getElementById('log-autoscroll')?.checked) consoleEl.scrollTop = consoleEl.scrollHeight;
       setTimeout(() => { statusEl.textContent = ''; }, 3000);
@@ -772,6 +889,28 @@ async function load() {
     document.getElementById('last-update').innerText = new Date(sensorTs).toLocaleString('es-CL', {
       day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Santiago'
     });
+
+    // Measurement interval / Frecuencia de medición
+    const intervalEl = document.getElementById('kpi-interval');
+    if (intervalEl) {
+      let intervalText = '--';
+      const interval = data.measurement_interval || data.intervalo || data.interval || data.frecuencia || data.frequency;
+      if (interval) {
+        const intervalVal = Number(interval);
+        if (Number.isFinite(intervalVal) && intervalVal > 0) {
+          if (intervalVal >= 3600) {
+            const hours = Math.round(intervalVal / 3600);
+            intervalText = `${hours}h`;
+          } else if (intervalVal >= 60) {
+            const mins = Math.round(intervalVal / 60);
+            intervalText = `${mins}m`;
+          } else {
+            intervalText = `${intervalVal}s`;
+          }
+        }
+      }
+      intervalEl.innerText = intervalText;
+    }
 
     // Readings grid
     const readings = Array.isArray(data.lecturas) ? data.lecturas : [];
