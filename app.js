@@ -996,9 +996,28 @@ async function load() {
 
   } catch (error) {
     console.error('Error al cargar datos:', error);
+    
+    // Fallback: intentar cargar datos cacheados
+    const cachedHistory = loadChartHistory();
+    if (cachedHistory && cachedHistory.timestamps && cachedHistory.timestamps.length > 0) {
+      trendHistory = cachedHistory;
+      trendHistoryFullRange = JSON.parse(JSON.stringify(trendHistory));
+      if (!trendChart) createTrendChart();
+      updateTrendChartData();
+      
+      document.getElementById('status').textContent = 'OFFLINE (CACHÉ)';
+      document.getElementById('status').className   = 'status-badge status-offline';
+      document.getElementById('status-meta').innerText   = 'Usando datos cacheados — sin conexión con servidor';
+      document.getElementById('sensor-status').innerText = 'Offline';
+      const dot = document.getElementById('sidebar-dot');
+      if (dot) dot.className = 'status-dot offline';
+      return;
+    }
+    
+    // Si no hay caché, mostrar error
     document.getElementById('status').textContent = 'ERROR';
     document.getElementById('status').className   = 'status-badge status-offline';
-    document.getElementById('status-meta').innerText   = 'No se pudieron obtener datos del sensor';
+    document.getElementById('status-meta').innerText   = 'No se pudieron obtener datos del servidor';
     document.getElementById('sensor-status').innerText = 'Error';
     const dot = document.getElementById('sidebar-dot');
     if (dot) dot.className = 'status-dot offline';
@@ -1085,7 +1104,20 @@ async function loadHistoricalData() {
     }
   }
 
-  if (!payload) return false;
+  // Si no se pudo obtener datos del servidor, usar cache
+  if (!payload) {
+    console.warn('No se pudo cargar datos históricos del servidor, usando cache...');
+    const stored = loadChartHistory();
+    if (stored && stored.timestamps && stored.timestamps.length > 0) {
+      trendHistory = stored;
+      trendHistoryRaw = Array.isArray(stored.rawLecturas) ? stored.rawLecturas : [];
+      const src = document.getElementById('history-source');
+      if (src) src.innerText = 'Base de datos (caché local)';
+      renderHistoryTable();
+      return true;
+    }
+    return false;
+  }
 
   let normalized = { lecturas: [] };
   if (Array.isArray(payload)) {
