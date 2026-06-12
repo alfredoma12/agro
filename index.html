@@ -7,6 +7,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AgroSensor">
 <meta name="theme-color" content="#2d6a4f">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>AgroSensor · Monitor de Campo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -713,6 +717,20 @@ body {
 
         <!-- Sub-panel: Mi planta -->
         <div class="settings-panel" id="config-planta">
+
+          <div class="settings-card">
+            <div class="settings-card-title">🔔 Notificaciones</div>
+            <div class="settings-card-desc">Recibe avisos cuando la temperatura o la humedad salgan del rango ideal de tu planta (por ejemplo, cuando necesite riego).</div>
+            <div class="settings-row" style="align-items:center;">
+              <div class="settings-field" style="flex:2; min-width:220px;">
+                <span id="notif-status" style="font-size:13px; color:var(--muted);">Verificando soporte de notificaciones...</span>
+              </div>
+              <div class="settings-field" style="flex:0 0 auto;">
+                <button class="btn btn-primary" style="width:auto; display:none;" id="notif-enable-btn">Activar notificaciones</button>
+              </div>
+            </div>
+          </div>
+
           <div class="settings-card">
             <div class="settings-card-title">¿Qué planta tiene tu sensor?</div>
             <div class="settings-card-desc">Selecciona la planta monitoreada (o define un perfil personalizado). Las alertas de temperatura y humedad se calcularán según estos rangos.</div>
@@ -726,8 +744,8 @@ body {
                 <label for="plant-preset">Planta</label>
                 <select id="plant-preset">
                   <option value="cactus">🌵 Cactus</option>
-                  <option value="ruda_templada">🌿 Ruda</option>
-                  <option value="filodendro">🌿 Filodendro</option>
+                  <option value="ruda_templada">🌿 Ruda (clima templado)</option>
+                  <option value="ruda_calida">🌿 Ruda (clima cálido)</option>
                   <option value="custom">⚙️ Personalizado</option>
                 </select>
               </div>

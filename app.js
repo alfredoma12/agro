@@ -23,7 +23,6 @@ let currentView = 'resumen';
 // ── PLANT PROFILES ───────────────────────────────────────────────────────────
 
 const PLANT_PROFILES_STORAGE_KEY = 'cfg-plant-profile';
-const WATER_ALERT_STATE_KEY      = 'water-alert-last-state';
 
 // Rangos definidos por el usuario.
 // Orden de cada rango: [min, max]
@@ -42,8 +41,8 @@ const PLANT_PRESETS = {
     aire:   [30, 50],
     tierra: [20, 40]
   },
-  filodendro: {
-    label: '🌿 Filodendro (clima cálido)',
+  ruda_calida: {
+    label: '🌿 Ruda (clima cálido)',
     tempLabel: 'Cálida (18°C – 25°C)',
     temp:   [18, 25],
     aire:   [30, 50],
@@ -224,20 +223,26 @@ function buildAlertMessages(current) {
 
   // Temperatura
   const tempState = evaluateRange(current.temperatura, thresholds.temp);
-  if (tempState === 'low')  alerts.push({ level: 'warn', icon: '🥶', text: `Temperatura muy baja (${current.temperatura}°C). Rango ideal: ${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C.` });
-  if (tempState === 'high') alerts.push({ level: 'warn', icon: '🥵', text: `Temperatura muy alta (${current.temperatura}°C). Rango ideal: ${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C.` });
+  if (tempState === 'low')  alerts.push({ level: 'warn', icon: '🥶', key: 'temp_low',  text: `Temperatura muy baja (${current.temperatura}°C). Rango ideal: ${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C.`,
+    notifyTitle: '🥶 Temperatura muy baja', notifyBody: `${current.temperatura}°C — por debajo del rango ideal (${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C).` });
+  if (tempState === 'high') alerts.push({ level: 'warn', icon: '🥵', key: 'temp_high', text: `Temperatura muy alta (${current.temperatura}°C). Rango ideal: ${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C.`,
+    notifyTitle: '🥵 Temperatura muy alta', notifyBody: `${current.temperatura}°C — por encima del rango ideal (${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C).` });
 
   // Humedad aire
   const aireState = evaluateRange(current.humedad_aire, thresholds.aire);
-  if (aireState === 'low')  alerts.push({ level: 'warn', icon: '🍂', text: `Humedad ambiental muy baja (${current.humedad_aire}%). Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%. Riesgo de puntas quemadas y plagas (ácaros).` });
-  if (aireState === 'high') alerts.push({ level: 'warn', icon: '💧', text: `Humedad ambiental muy alta (${current.humedad_aire}%). Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%. Riesgo de hongos foliares.` });
+  if (aireState === 'low')  alerts.push({ level: 'warn', icon: '🍂', key: 'aire_low',  text: `Humedad ambiental muy baja (${current.humedad_aire}%). Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%. Riesgo de puntas quemadas y plagas (ácaros).`,
+    notifyTitle: '🍂 Humedad ambiental baja', notifyBody: `${current.humedad_aire}% — riesgo de puntas quemadas y plagas. Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%.` });
+  if (aireState === 'high') alerts.push({ level: 'warn', icon: '💧', key: 'aire_high', text: `Humedad ambiental muy alta (${current.humedad_aire}%). Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%. Riesgo de hongos foliares.`,
+    notifyTitle: '💧 Humedad ambiental alta', notifyBody: `${current.humedad_aire}% — riesgo de hongos foliares. Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%.` });
 
   // Humedad tierra
   const tierraState = evaluateRange(current.humedad_tierra, thresholds.tierra);
-  if (tierraState === 'low')  alerts.push({ level: 'critical', icon: '🚱', text: `Humedad de sustrato muy baja (${current.humedad_tierra}%). Rango ideal: ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%. ¡Riega la planta!` });
-  if (tierraState === 'high') alerts.push({ level: 'critical', icon: '🌊', text: `Humedad de sustrato muy alta (${current.humedad_tierra}%). Rango ideal: ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%. Riesgo de pudrición radicular. No riegues.` });
+  if (tierraState === 'low')  alerts.push({ level: 'critical', icon: '🚱', key: 'tierra_low',  text: `Humedad de sustrato muy baja (${current.humedad_tierra}%). Rango ideal: ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%. ¡Riega la planta!`,
+    notifyTitle: '🚱 ¡Tu planta necesita agua!', notifyBody: `Humedad de sustrato: ${current.humedad_tierra}% (rango ideal ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%). Riega tu planta pronto.`, requireInteraction: true });
+  if (tierraState === 'high') alerts.push({ level: 'critical', icon: '🌊', key: 'tierra_high', text: `Humedad de sustrato muy alta (${current.humedad_tierra}%). Rango ideal: ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%. Riesgo de pudrición radicular. No riegues.`,
+    notifyTitle: '🌊 Exceso de agua en el sustrato', notifyBody: `Humedad de sustrato: ${current.humedad_tierra}% (rango ideal ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%). No riegues: riesgo de pudrición radicular.`, requireInteraction: true });
 
-  return { alerts, tierraState };
+  return alerts;
 }
 
 function renderAlerts(alerts) {
@@ -259,34 +264,61 @@ function renderAlerts(alerts) {
   `).join('');
 }
 
-// Notificación del navegador cuando la humedad de tierra está muy baja
-function maybeNotifyWatering(tierraState) {
-  let lastState = null;
-  try { lastState = localStorage.getItem(WATER_ALERT_STATE_KEY); } catch (_) {}
+// Lleva el registro de qué alertas estaban activas en la última revisión,
+// para notificar solo cuando una alerta pasa de "ok" a "activa" (evita spam).
+const ALERT_STATE_KEY = 'agrosensor-alert-state';
 
-  if (tierraState === 'low') {
-    if (lastState !== 'low') {
-      sendWaterNotification();
-    }
-    try { localStorage.setItem(WATER_ALERT_STATE_KEY, 'low'); } catch (_) {}
-  } else {
-    try { localStorage.setItem(WATER_ALERT_STATE_KEY, tierraState || 'ok'); } catch (_) {}
-  }
+function loadAlertState() {
+  try {
+    const stored = localStorage.getItem(ALERT_STATE_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch { return {}; }
 }
 
-function sendWaterNotification() {
-  const title = '🚱 ¡Tu planta necesita agua!';
-  const body  = 'La humedad del sustrato está por debajo del rango ideal. Riega tu planta pronto.';
+function saveAlertState(state) {
+  try { localStorage.setItem(ALERT_STATE_KEY, JSON.stringify(state)); } catch (_) {}
+}
 
+// Notifica solo las alertas que acaban de activarse (no estaban activas antes)
+function notifyNewAlerts(alerts) {
+  const prevState = loadAlertState();
+  const newState = {};
+
+  alerts.forEach(a => {
+    newState[a.key] = true;
+    if (!prevState[a.key]) {
+      sendAppNotification(a.notifyTitle || a.text, a.notifyBody || a.text, `agrosensor-${a.key}`, !!a.requireInteraction);
+    }
+  });
+
+  saveAlertState(newState);
+}
+
+function sendAppNotification(title, body, tag, requireInteraction = false) {
   if (!('Notification' in window)) return;
 
+  const fire = () => {
+    // Preferir el Service Worker (más fiable en Android, funciona con la app
+    // en segundo plano y permite ícono/vibración/acciones).
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.active?.postMessage({
+          type: 'SHOW_NOTIFICATION',
+          payload: { title, body, tag, requireInteraction }
+        });
+      }).catch(() => {
+        try { new Notification(title, { body, tag }); } catch (_) {}
+      });
+    } else {
+      try { new Notification(title, { body, tag }); } catch (_) {}
+    }
+  };
+
   if (Notification.permission === 'granted') {
-    try { new Notification(title, { body, icon: '🌱' }); } catch (_) {}
+    fire();
   } else if (Notification.permission !== 'denied') {
     Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        try { new Notification(title, { body, icon: '🌱' }); } catch (_) {}
-      }
+      if (permission === 'granted') fire();
     });
   }
 }
@@ -298,9 +330,9 @@ function updateAlerts() {
     renderAlerts([]);
     return;
   }
-  const { alerts, tierraState } = buildAlertMessages(current);
+  const alerts = buildAlertMessages(current);
   renderAlerts(alerts);
-  maybeNotifyWatering(tierraState);
+  notifyNewAlerts(alerts);
 }
 
 function getLatestReadingValues() {
@@ -1485,7 +1517,60 @@ async function debugTelemetryHistory() {
 }
 window.debugTelemetryHistory = debugTelemetryHistory;
 
-// ── PWA: "AGREGAR A PANTALLA DE INICIO" ─────────────────────────────────────
+// ── SERVICE WORKER ────────────────────────────────────────────────────────
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('./service-worker.js')
+    .catch(err => console.warn('No se pudo registrar el Service Worker:', err));
+}
+
+// ── NOTIFICACIONES: PERMISO ──────────────────────────────────────────────────
+
+function updateNotificationStatusUI() {
+  const statusEl = document.getElementById('notif-status');
+  const btn      = document.getElementById('notif-enable-btn');
+  if (!statusEl || !btn) return;
+
+  if (!('Notification' in window)) {
+    statusEl.textContent = 'Tu navegador no soporta notificaciones.';
+    statusEl.style.color = 'var(--muted)';
+    btn.style.display = 'none';
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    statusEl.textContent = '✅ Notificaciones activadas. Recibirás alertas de tu planta.';
+    statusEl.style.color = 'var(--success)';
+    btn.style.display = 'none';
+  } else if (Notification.permission === 'denied') {
+    statusEl.textContent = '❌ Notificaciones bloqueadas. Habilítalas desde la configuración del navegador.';
+    statusEl.style.color = 'var(--error)';
+    btn.style.display = 'none';
+  } else {
+    statusEl.textContent = 'Activa las notificaciones para recibir alertas (riego, temperatura, humedad) aunque no tengas la app abierta.';
+    statusEl.style.color = 'var(--muted)';
+    btn.style.display = 'inline-flex';
+  }
+}
+
+function setupNotificationPermissionUI() {
+  const btn = document.getElementById('notif-enable-btn');
+  updateNotificationStatusUI();
+
+  btn?.addEventListener('click', () => {
+    if (!('Notification' in window)) return;
+    Notification.requestPermission().then(() => {
+      updateNotificationStatusUI();
+      // Notificación de confirmación
+      if (Notification.permission === 'granted') {
+        sendAppNotification('🌿 AgroSensor', 'Notificaciones activadas correctamente.', 'agrosensor-confirm', false);
+      }
+    });
+  });
+}
+
+
 
 const PWA_PROMPT_DISMISSED_KEY = 'pwa-install-dismissed';
 let deferredInstallPrompt = null;
@@ -1566,9 +1651,11 @@ function setupPwaInstallPrompt() {
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
+  registerServiceWorker();
   setupHistoryFilterUI();
   setupChartRangeButtons();
   setupPlantProfileUI();
+  setupNotificationPermissionUI();
   setupPwaInstallPrompt();
   if (token && device) {
     showDashboard();
