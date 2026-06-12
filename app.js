@@ -20,6 +20,299 @@ let AUTO_REFRESH_INTERVAL_MS = 30000;
 let currentConfigSubview = 'general';
 let currentView = 'resumen';
 
+// ── PLANT PROFILES ───────────────────────────────────────────────────────────
+
+const PLANT_PROFILES_STORAGE_KEY = 'cfg-plant-profile';
+const WATER_ALERT_STATE_KEY      = 'water-alert-last-state';
+
+// Rangos definidos por el usuario.
+// Orden de cada rango: [min, max]
+const PLANT_PRESETS = {
+  cactus: {
+    label: '🌵 Cactus',
+    tempLabel: 'Cálida (15°C – 30°C)',
+    temp:   [15, 30],
+    aire:   [10, 30],
+    tierra: [5, 15]
+  },
+  ruda_templada: {
+    label: '🌿 Ruda (clima templado)',
+    tempLabel: 'Templada (10°C – 25°C)',
+    temp:   [10, 25],
+    aire:   [30, 50],
+    tierra: [20, 40]
+  },
+  filodendro: {
+    label: '🌿 Filodendro (clima cálido)',
+    tempLabel: 'Cálida (18°C – 25°C)',
+    temp:   [18, 25],
+    aire:   [30, 50],
+    tierra: [50, 80]
+  },
+  custom: {
+    label: '⚙️ Personalizado',
+    tempLabel: 'Personalizado',
+    temp:   [null, null],
+    aire:   [null, null],
+    tierra: [null, null]
+  }
+};
+
+function loadPlantProfile() {
+  try {
+    const stored = localStorage.getItem(PLANT_PROFILES_STORAGE_KEY);
+    if (!stored) return { preset: 'cactus', custom: { temp: [null, null], aire: [null, null], tierra: [null, null] }, plantName: '' };
+    const parsed = JSON.parse(stored);
+    return {
+      preset: parsed.preset || 'cactus',
+      custom: parsed.custom || { temp: [null, null], aire: [null, null], tierra: [null, null] },
+      plantName: parsed.plantName || ''
+    };
+  } catch {
+    return { preset: 'cactus', custom: { temp: [null, null], aire: [null, null], tierra: [null, null] }, plantName: '' };
+  }
+}
+
+function savePlantProfile(profile) {
+  try { localStorage.setItem(PLANT_PROFILES_STORAGE_KEY, JSON.stringify(profile)); } catch (_) {}
+}
+
+// Devuelve los rangos activos (preset o personalizado)
+function getActiveThresholds() {
+  const profile = loadPlantProfile();
+  if (profile.preset === 'custom') {
+    return {
+      temp:   profile.custom.temp   || [null, null],
+      aire:   profile.custom.aire   || [null, null],
+      tierra: profile.custom.tierra || [null, null]
+    };
+  }
+  const preset = PLANT_PRESETS[profile.preset] || PLANT_PRESETS.cactus;
+  return { temp: preset.temp, aire: preset.aire, tierra: preset.tierra };
+}
+
+// ── PLANT PROFILE UI ────────────────────────────────────────────────────────
+
+function setupPlantProfileUI() {
+  const presetSel  = document.getElementById('plant-preset');
+  const nameInput  = document.getElementById('plant-name');
+  const customWrap = document.getElementById('plant-custom-fields');
+  if (!presetSel) return;
+
+  const profile = loadPlantProfile();
+  presetSel.value = profile.preset;
+  if (nameInput) nameInput.value = profile.plantName || '';
+
+  populatePlantInfoBox(profile.preset);
+  toggleCustomFields(profile.preset === 'custom');
+
+  if (profile.preset === 'custom') {
+    fillCustomInputs(profile.custom);
+  }
+
+  presetSel.addEventListener('change', () => {
+    const val = presetSel.value;
+    populatePlantInfoBox(val);
+    toggleCustomFields(val === 'custom');
+    if (val === 'custom') {
+      const p = loadPlantProfile();
+      fillCustomInputs(p.custom);
+    }
+  });
+
+  function toggleCustomFields(show) {
+    if (customWrap) customWrap.style.display = show ? 'block' : 'none';
+  }
+
+  function fillCustomInputs(custom) {
+    setVal('plant-custom-temp-min',   custom.temp?.[0]);
+    setVal('plant-custom-temp-max',   custom.temp?.[1]);
+    setVal('plant-custom-aire-min',   custom.aire?.[0]);
+    setVal('plant-custom-aire-max',   custom.aire?.[1]);
+    setVal('plant-custom-tierra-min', custom.tierra?.[0]);
+    setVal('plant-custom-tierra-max', custom.tierra?.[1]);
+  }
+
+  function setVal(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = (value === null || value === undefined) ? '' : value;
+  }
+}
+
+function populatePlantInfoBox(presetKey) {
+  const box = document.getElementById('plant-info-box');
+  if (!box) return;
+  if (presetKey === 'custom') {
+    box.innerHTML = '<div class="plant-info-row">Define tus propios rangos en los campos a continuación.</div>';
+    return;
+  }
+  const preset = PLANT_PRESETS[presetKey];
+  if (!preset) { box.innerHTML = ''; return; }
+  box.innerHTML = `
+    <div class="plant-info-row"><strong>🌡️ Temperatura ideal:</strong> ${preset.tempLabel}</div>
+    <div class="plant-info-row"><strong>☁️ Humedad ambiente ideal:</strong> ${preset.aire[0]}% – ${preset.aire[1]}%</div>
+    <div class="plant-info-row"><strong>🌱 Humedad de sustrato ideal:</strong> ${preset.tierra[0]}% – ${preset.tierra[1]}%</div>
+  `;
+}
+
+function savePlantProfileFromUI() {
+  const presetSel = document.getElementById('plant-preset');
+  const nameInput = document.getElementById('plant-name');
+  const statusEl  = document.getElementById('cfg-plant-status');
+  if (!presetSel) return;
+
+  const preset = presetSel.value;
+  const profile = {
+    preset,
+    plantName: nameInput ? nameInput.value.trim() : '',
+    custom: {
+      temp:   [getNum('plant-custom-temp-min'),   getNum('plant-custom-temp-max')],
+      aire:   [getNum('plant-custom-aire-min'),   getNum('plant-custom-aire-max')],
+      tierra: [getNum('plant-custom-tierra-min'), getNum('plant-custom-tierra-max')]
+    }
+  };
+
+  if (preset === 'custom') {
+    const allFilled = [...profile.custom.temp, ...profile.custom.aire, ...profile.custom.tierra]
+      .every(v => v !== null);
+    if (!allFilled) {
+      if (statusEl) {
+        statusEl.textContent = '❌ Completa todos los rangos personalizados.';
+        statusEl.style.color = 'var(--error)';
+        statusEl.style.display = 'block';
+      }
+      return;
+    }
+  }
+
+  savePlantProfile(profile);
+
+  if (statusEl) {
+    statusEl.textContent = '✅ Perfil de planta guardado correctamente.';
+    statusEl.style.color = 'var(--success)';
+    statusEl.style.display = 'block';
+    setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
+  }
+
+  // Refrescar alertas con los nuevos umbrales
+  updateAlerts();
+
+  function getNum(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const v = el.value.trim();
+    if (v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+}
+
+// ── ALERTS ────────────────────────────────────────────────────────────────────
+
+// Evalúa un valor contra un rango [min, max] y devuelve 'low' | 'high' | 'ok' | null
+function evaluateRange(value, range) {
+  if (value === null || value === undefined || Number.isNaN(value)) return null;
+  if (!range || range[0] === null || range[1] === null) return null;
+  if (value < range[0]) return 'low';
+  if (value > range[1]) return 'high';
+  return 'ok';
+}
+
+function buildAlertMessages(current) {
+  const thresholds = getActiveThresholds();
+  const alerts = [];
+
+  // Temperatura
+  const tempState = evaluateRange(current.temperatura, thresholds.temp);
+  if (tempState === 'low')  alerts.push({ level: 'warn', icon: '🥶', text: `Temperatura muy baja (${current.temperatura}°C). Rango ideal: ${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C.` });
+  if (tempState === 'high') alerts.push({ level: 'warn', icon: '🥵', text: `Temperatura muy alta (${current.temperatura}°C). Rango ideal: ${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C.` });
+
+  // Humedad aire
+  const aireState = evaluateRange(current.humedad_aire, thresholds.aire);
+  if (aireState === 'low')  alerts.push({ level: 'warn', icon: '🍂', text: `Humedad ambiental muy baja (${current.humedad_aire}%). Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%. Riesgo de puntas quemadas y plagas (ácaros).` });
+  if (aireState === 'high') alerts.push({ level: 'warn', icon: '💧', text: `Humedad ambiental muy alta (${current.humedad_aire}%). Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%. Riesgo de hongos foliares.` });
+
+  // Humedad tierra
+  const tierraState = evaluateRange(current.humedad_tierra, thresholds.tierra);
+  if (tierraState === 'low')  alerts.push({ level: 'critical', icon: '🚱', text: `Humedad de sustrato muy baja (${current.humedad_tierra}%). Rango ideal: ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%. ¡Riega la planta!` });
+  if (tierraState === 'high') alerts.push({ level: 'critical', icon: '🌊', text: `Humedad de sustrato muy alta (${current.humedad_tierra}%). Rango ideal: ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%. Riesgo de pudrición radicular. No riegues.` });
+
+  return { alerts, tierraState };
+}
+
+function renderAlerts(alerts) {
+  const container = document.getElementById('alerts-container');
+  if (!container) return;
+
+  if (!alerts.length) {
+    container.innerHTML = '';
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'flex';
+  container.innerHTML = alerts.map(a => `
+    <div class="alert-banner ${a.level === 'critical' ? 'alert-critical' : 'alert-warn'}">
+      <span class="alert-icon">${a.icon}</span>
+      <span class="alert-text">${a.text}</span>
+    </div>
+  `).join('');
+}
+
+// Notificación del navegador cuando la humedad de tierra está muy baja
+function maybeNotifyWatering(tierraState) {
+  let lastState = null;
+  try { lastState = localStorage.getItem(WATER_ALERT_STATE_KEY); } catch (_) {}
+
+  if (tierraState === 'low') {
+    if (lastState !== 'low') {
+      sendWaterNotification();
+    }
+    try { localStorage.setItem(WATER_ALERT_STATE_KEY, 'low'); } catch (_) {}
+  } else {
+    try { localStorage.setItem(WATER_ALERT_STATE_KEY, tierraState || 'ok'); } catch (_) {}
+  }
+}
+
+function sendWaterNotification() {
+  const title = '🚱 ¡Tu planta necesita agua!';
+  const body  = 'La humedad del sustrato está por debajo del rango ideal. Riega tu planta pronto.';
+
+  if (!('Notification' in window)) return;
+
+  if (Notification.permission === 'granted') {
+    try { new Notification(title, { body, icon: '🌱' }); } catch (_) {}
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        try { new Notification(title, { body, icon: '🌱' }); } catch (_) {}
+      }
+    });
+  }
+}
+
+// Recalcula las alertas usando la última lectura disponible
+function updateAlerts() {
+  const current = getLatestReadingValues();
+  if (!current) {
+    renderAlerts([]);
+    return;
+  }
+  const { alerts, tierraState } = buildAlertMessages(current);
+  renderAlerts(alerts);
+  maybeNotifyWatering(tierraState);
+}
+
+function getLatestReadingValues() {
+  if (!trendHistory.timestamps.length) return null;
+  const i = trendHistory.timestamps.length - 1;
+  return {
+    temperatura:    trendHistory.temperatura[i],
+    humedad_aire:   trendHistory.humedad_aire[i],
+    humedad_tierra: trendHistory.humedad_tierra[i]
+  };
+}
+
 // ── UTILS ─────────────────────────────────────────────────────────────────────
 
 function validateInput(value, type = 'text') {
@@ -531,7 +824,7 @@ function switchView(viewName) {
 }
 
 function switchConfigSubview(subviewName) {
-  const panels = ['general', 'logs'];
+  const panels = ['general', 'planta', 'logs'];
   if (!panels.includes(subviewName)) return;
   currentConfigSubview = subviewName;
 
@@ -622,51 +915,6 @@ function saveMeasurementInterval() {
       statusEl.style.color = 'var(--error)';
       statusEl.style.display = 'block';
     }
-  }
-}
-
-function saveThresholds() {
-  const statusEl = document.getElementById('cfg-thresholds-status');
-  if (!statusEl) return;
-
-  const thresholds = {
-    temperatura: {
-      min: Number(document.getElementById('th-temp-min')?.value),
-      max: Number(document.getElementById('th-temp-max')?.value)
-    },
-    aire: {
-      min: Number(document.getElementById('th-aire-min')?.value),
-      max: Number(document.getElementById('th-aire-max')?.value)
-    },
-    tierra: {
-      min: Number(document.getElementById('th-tierra-min')?.value),
-      max: Number(document.getElementById('th-tierra-max')?.value)
-    }
-  };
-
-  // Validar que al menos uno tenga valores válidos
-  const hasValidThresholds = Object.values(thresholds).some(t => 
-    Number.isFinite(t.min) || Number.isFinite(t.max)
-  );
-
-  if (!hasValidThresholds) {
-    statusEl.textContent = '❌ Ingresa al menos un umbral válido.';
-    statusEl.style.color = 'var(--error)';
-    statusEl.style.display = 'block';
-    return;
-  }
-
-  // Guardar en localStorage
-  try {
-    localStorage.setItem('cfg-thresholds', JSON.stringify(thresholds));
-    statusEl.textContent = '✅ Umbrales guardados correctamente.';
-    statusEl.style.color = 'var(--success)';
-    statusEl.style.display = 'block';
-    setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
-  } catch (_) {
-    statusEl.textContent = '❌ No se pudo guardar los umbrales.';
-    statusEl.style.color = 'var(--error)';
-    statusEl.style.display = 'block';
   }
 }
 
@@ -994,6 +1242,9 @@ async function load() {
     trendHistoryFullRange = JSON.parse(JSON.stringify(trendHistory));
     updateTrendChartData();
 
+    // Evaluar alertas según el perfil de planta activo
+    updateAlerts();
+
   } catch (error) {
     console.error('Error al cargar datos:', error);
     
@@ -1004,6 +1255,7 @@ async function load() {
       trendHistoryFullRange = JSON.parse(JSON.stringify(trendHistory));
       if (!trendChart) createTrendChart();
       updateTrendChartData();
+      updateAlerts();
       
       document.getElementById('status').textContent = 'OFFLINE (CACHÉ)';
       document.getElementById('status').className   = 'status-badge status-offline';
@@ -1233,11 +1485,91 @@ async function debugTelemetryHistory() {
 }
 window.debugTelemetryHistory = debugTelemetryHistory;
 
+// ── PWA: "AGREGAR A PANTALLA DE INICIO" ─────────────────────────────────────
+
+const PWA_PROMPT_DISMISSED_KEY = 'pwa-install-dismissed';
+let deferredInstallPrompt = null;
+
+function isStandaloneMode() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true; // iOS Safari
+}
+
+function isMobileDevice() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+function isIOS() {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+function showInstallPrompt() {
+  if (isStandaloneMode()) return;
+  if (!isMobileDevice()) return;
+
+  try {
+    if (localStorage.getItem(PWA_PROMPT_DISMISSED_KEY) === 'true') return;
+  } catch (_) {}
+
+  const modal = document.getElementById('pwa-install-modal');
+  if (!modal) return;
+
+  const iosInstructions     = document.getElementById('pwa-ios-instructions');
+  const androidInstructions = document.getElementById('pwa-android-instructions');
+  const installBtn          = document.getElementById('pwa-install-btn');
+
+  if (isIOS()) {
+    if (iosInstructions)     iosInstructions.style.display = 'block';
+    if (androidInstructions) androidInstructions.style.display = 'none';
+    if (installBtn)          installBtn.style.display = 'none';
+  } else {
+    if (iosInstructions)     iosInstructions.style.display = 'none';
+    if (androidInstructions) androidInstructions.style.display = 'block';
+    if (installBtn)          installBtn.style.display = deferredInstallPrompt ? 'inline-flex' : 'none';
+  }
+
+  modal.classList.add('show');
+}
+
+function hidePwaModal(remember) {
+  const modal = document.getElementById('pwa-install-modal');
+  if (modal) modal.classList.remove('show');
+  if (remember) {
+    try { localStorage.setItem(PWA_PROMPT_DISMISSED_KEY, 'true'); } catch (_) {}
+  }
+}
+
+function setupPwaInstallPrompt() {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const installBtn = document.getElementById('pwa-install-btn');
+    if (installBtn) installBtn.style.display = 'inline-flex';
+  });
+
+  const installBtn = document.getElementById('pwa-install-btn');
+  installBtn?.addEventListener('click', async () => {
+    if (!deferredInstallPrompt) { hidePwaModal(true); return; }
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    hidePwaModal(true);
+  });
+
+  document.getElementById('pwa-dismiss-btn')?.addEventListener('click', () => hidePwaModal(true));
+  document.getElementById('pwa-later-btn')?.addEventListener('click', () => hidePwaModal(false));
+
+  // Mostrar el modal con un pequeño delay para no interrumpir la carga inicial
+  setTimeout(showInstallPrompt, 1500);
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   setupHistoryFilterUI();
   setupChartRangeButtons();
+  setupPlantProfileUI();
+  setupPwaInstallPrompt();
   if (token && device) {
     showDashboard();
     startAutoRefresh();

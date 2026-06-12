@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AgroSensor">
+<meta name="theme-color" content="#2d6a4f">
 <title>AgroSensor · Monitor de Campo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -202,6 +206,21 @@ body {
 .section-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
 .section-title { font-size: 15px; font-weight: 700; color: var(--text); }
 
+/* ── ALERTS ──────────────────────────────────────────────── */
+#alerts-container { display: none; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+.alert-banner {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 16px; border-radius: var(--radius);
+  font-size: 13.5px; line-height: 1.5; box-shadow: var(--shadow);
+  border: 1px solid transparent;
+}
+.alert-banner .alert-icon { font-size: 20px; line-height: 1.3; flex-shrink: 0; }
+.alert-banner .alert-text { color: var(--text); }
+.alert-warn     { background: var(--warn-bg);  border-color: rgba(185,119,14,0.25); }
+.alert-warn .alert-text     { color: var(--warn); }
+.alert-critical { background: var(--error-bg); border-color: rgba(192,57,43,0.25); }
+.alert-critical .alert-text { color: var(--error); }
+
 /* Readings grid */
 #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-bottom: 28px; }
 .reading-card {
@@ -303,6 +322,14 @@ body {
 .threshold-range input { width: 100%; padding: 9px 10px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-family: inherit; background: #fff; }
 .threshold-range span { color: var(--muted); font-size: 12px; }
 
+/* ── PLANT PROFILE PANEL ─────────────────────────────────── */
+.plant-info-box {
+  background: var(--cream); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; margin-top: 16px; font-size: 13.5px; color: var(--text-soft);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.plant-info-row strong { color: var(--text); }
+
 /* Logs */
 .log-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
 .log-console {
@@ -322,6 +349,29 @@ body {
 
 .auto-scroll-toggle { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-soft); cursor: pointer; user-select: none; }
 .auto-scroll-toggle input { accent-color: var(--leaf); width: 16px; height: 16px; }
+
+/* ── PWA INSTALL MODAL ───────────────────────────────────── */
+#pwa-install-modal {
+  position: fixed; inset: 0; z-index: 1000;
+  display: none; align-items: flex-end; justify-content: center;
+  background: rgba(30,27,24,0.45); padding: 16px;
+}
+#pwa-install-modal.show { display: flex; }
+.pwa-modal-card {
+  background: #fff; border-radius: 18px; padding: 22px 22px 18px;
+  width: 100%; max-width: 420px; box-shadow: var(--shadow-lg);
+  animation: pwaSlideUp 0.3s ease;
+}
+@keyframes pwaSlideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.pwa-modal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.pwa-modal-icon { font-size: 32px; line-height: 1; }
+.pwa-modal-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.pwa-modal-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.pwa-modal-body { font-size: 13.5px; color: var(--text-soft); line-height: 1.6; margin-bottom: 16px; }
+.pwa-modal-body ol { margin: 8px 0 0 18px; }
+.pwa-modal-body li { margin-bottom: 4px; }
+.pwa-modal-actions { display: flex; gap: 10px; }
+.pwa-modal-actions .btn { flex: 1; width: auto; }
 
 /* ── MOBILE ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
@@ -497,6 +547,7 @@ body {
         </button>
         <div class="nav-sub collapsed" id="config-subnav">
           <button class="nav-sub-item active" data-subview="general" onclick="switchConfigSubview('general')">General &amp; Umbrales</button>
+          <button class="nav-sub-item" data-subview="planta" onclick="switchConfigSubview('planta')">🌱 Mi planta</button>
           <button class="nav-sub-item" data-subview="logs" onclick="switchConfigSubview('logs')">Logs del ESP32</button>
         </div>
       </nav>
@@ -525,6 +576,10 @@ body {
 
       <!-- ── VIEW: RESUMEN ─────────────────────────────────── -->
       <section class="view active" id="view-resumen">
+
+        <!-- Alertas según el perfil de planta -->
+        <div id="alerts-container"></div>
+
         <div class="kpi-row">
           <div class="kpi">
             <div class="kpi-label">⏱ Última lectura</div>
@@ -656,6 +711,68 @@ body {
           </div>
         </div>
 
+        <!-- Sub-panel: Mi planta -->
+        <div class="settings-panel" id="config-planta">
+          <div class="settings-card">
+            <div class="settings-card-title">¿Qué planta tiene tu sensor?</div>
+            <div class="settings-card-desc">Selecciona la planta monitoreada (o define un perfil personalizado). Las alertas de temperatura y humedad se calcularán según estos rangos.</div>
+
+            <div class="settings-row">
+              <div class="settings-field">
+                <label for="plant-name">Nombre / ubicación (opcional)</label>
+                <input id="plant-name" type="text" placeholder="Ej: Cactus del balcón">
+              </div>
+              <div class="settings-field">
+                <label for="plant-preset">Planta</label>
+                <select id="plant-preset">
+                  <option value="cactus">🌵 Cactus</option>
+                  <option value="ruda_templada">🌿 Ruda (clima templado)</option>
+                  <option value="ruda_calida">🌿 Ruda (clima cálido)</option>
+                  <option value="custom">⚙️ Personalizado</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="plant-info-box" id="plant-info-box"></div>
+
+            <div id="plant-custom-fields" style="display:none; margin-top:18px;">
+              <div class="threshold-grid">
+                <div class="threshold-item">
+                  <div class="threshold-item-title">☀️ Temperatura (°C)</div>
+                  <div class="threshold-range">
+                    <input id="plant-custom-temp-min" type="number" step="0.5" placeholder="Mín">
+                    <span>—</span>
+                    <input id="plant-custom-temp-max" type="number" step="0.5" placeholder="Máx">
+                  </div>
+                </div>
+                <div class="threshold-item">
+                  <div class="threshold-item-title">☁️ Humedad ambiente (%)</div>
+                  <div class="threshold-range">
+                    <input id="plant-custom-aire-min" type="number" step="1" min="0" max="100" placeholder="Mín">
+                    <span>—</span>
+                    <input id="plant-custom-aire-max" type="number" step="1" min="0" max="100" placeholder="Máx">
+                  </div>
+                </div>
+                <div class="threshold-item">
+                  <div class="threshold-item-title">🌱 Humedad de sustrato (%)</div>
+                  <div class="threshold-range">
+                    <input id="plant-custom-tierra-min" type="number" step="1" min="0" max="100" placeholder="Mín">
+                    <span>—</span>
+                    <input id="plant-custom-tierra-max" type="number" step="1" min="0" max="100" placeholder="Máx">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-row" style="margin-top:18px;">
+              <div class="settings-field" style="flex:0 0 auto;">
+                <button class="btn btn-primary" style="width:auto;" onclick="savePlantProfileFromUI()">Guardar perfil de planta</button>
+              </div>
+            </div>
+            <div class="settings-status" id="cfg-plant-status"></div>
+          </div>
+        </div>
+
         <!-- Sub-panel: Logs -->
         <div class="settings-panel" id="config-logs">
           <div class="settings-card">
@@ -680,6 +797,37 @@ body {
       </section>
 
     </main>
+  </div>
+</div>
+
+<!-- ── PWA INSTALL MODAL ──────────────────────────────────── -->
+<div id="pwa-install-modal">
+  <div class="pwa-modal-card">
+    <div class="pwa-modal-header">
+      <span class="pwa-modal-icon">🌿</span>
+      <div>
+        <div class="pwa-modal-title">Instala AgroSensor</div>
+        <div class="pwa-modal-sub">Agrégala a tu pantalla de inicio para un acceso más rápido</div>
+      </div>
+    </div>
+    <div class="pwa-modal-body">
+      <div id="pwa-android-instructions">
+        Instala esta app en tu teléfono para acceder directamente desde tu pantalla principal, sin abrir el navegador.
+      </div>
+      <div id="pwa-ios-instructions" style="display:none;">
+        Para instalarla en iPhone/iPad:
+        <ol>
+          <li>Toca el botón <strong>Compartir</strong> (el cuadro con la flecha hacia arriba) en la barra de Safari.</li>
+          <li>Selecciona <strong>"Agregar a pantalla de inicio"</strong>.</li>
+          <li>Confirma tocando <strong>"Agregar"</strong>.</li>
+        </ol>
+      </div>
+    </div>
+    <div class="pwa-modal-actions">
+      <button class="btn btn-secondary" id="pwa-later-btn" type="button">Más tarde</button>
+      <button class="btn btn-primary" id="pwa-install-btn" type="button" style="display:none;">Instalar</button>
+      <button class="btn btn-primary" id="pwa-dismiss-btn" type="button">Entendido</button>
+    </div>
   </div>
 </div>
 
