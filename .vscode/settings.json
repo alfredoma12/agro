@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd /d C:\\\\Users\\\\Alfredo\\\\Desktop\\\\dashboard-pro; python -c \"from pathlib import Path; p=Path\\('index\\.html'\\); lines=p\\.read_text\\(encoding='utf-8', errors='replace'\\)\\.splitlines\\(\\); \nfor i,line in enumerate\\(lines,1\\):\n if 'switchView' in line or 'onclick' in line or 'app\\.js' in line: print\\(i, line\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

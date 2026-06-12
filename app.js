@@ -15,7 +15,9 @@ let trendHistory    = { timestamps: [], temperatura: [], humedad_aire: [], humed
 let trendHistoryRaw = [];
 
 const HISTORY_STORAGE_KEY      = 'dashboard-history';
-const AUTO_REFRESH_INTERVAL_MS = 30000;
+let AUTO_REFRESH_INTERVAL_MS = 30000;
+let currentConfigSubview = 'general';
+let currentView = 'resumen';
 
 // ── UTILS ─────────────────────────────────────────────────────────────────────
 
@@ -445,6 +447,145 @@ function showTab(event, tabName) {
   btn.classList.add('active');
   clearErrors();
   document.getElementById('admin-success')?.classList.remove('show');
+}
+
+function switchView(viewName) {
+  const views = ['resumen', 'tendencia', 'configuracion'];
+  if (!views.includes(viewName)) return;
+  currentView = viewName;
+
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === viewName);
+  });
+
+  document.querySelectorAll('.view').forEach(view => {
+    view.classList.toggle('active', view.id === `view-${viewName}`);
+  });
+
+  const configSubnav = document.getElementById('config-subnav');
+  if (configSubnav) {
+    configSubnav.classList.toggle('collapsed', viewName !== 'configuracion');
+  }
+
+  if (viewName === 'configuracion') {
+    switchConfigSubview(currentConfigSubview || 'general');
+  } else {
+    currentConfigSubview = 'general';
+    document.querySelectorAll('.nav-sub-item').forEach(btn => btn.classList.remove('active'));
+  }
+}
+
+function switchConfigSubview(subviewName) {
+  const panels = ['general', 'logs'];
+  if (!panels.includes(subviewName)) return;
+  currentConfigSubview = subviewName;
+
+  document.querySelectorAll('.nav-sub-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.subview === subviewName);
+  });
+
+  document.querySelectorAll('.settings-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.id === `config-${subviewName}`);
+  });
+}
+
+function saveMeasurementInterval() {
+  const valueEl = document.getElementById('cfg-interval-value');
+  const unitEl = document.getElementById('cfg-interval-unit');
+  const statusEl = document.getElementById('cfg-interval-status');
+  if (!valueEl || !unitEl || !statusEl) return;
+
+  const value = Number(valueEl.value);
+  const unit = unitEl.value;
+  if (!Number.isFinite(value) || value <= 0) {
+    statusEl.textContent = 'Ingresa un intervalo válido.';
+    statusEl.style.color = 'var(--error)';
+    return;
+  }
+
+  try {
+    localStorage.setItem('cfg-interval', JSON.stringify({ value, unit }));
+    statusEl.textContent = 'Intervalo guardado.';
+    statusEl.style.color = 'var(--success)';
+  } catch (_) {
+    statusEl.textContent = 'No se pudo guardar el intervalo.';
+    statusEl.style.color = 'var(--error)';
+  }
+}
+
+function saveThresholds() {
+  const statusEl = document.getElementById('cfg-thresholds-status');
+  if (!statusEl) return;
+
+  const thresholds = {
+    temperatura: {
+      min: Number(document.getElementById('th-temp-min')?.value),
+      max: Number(document.getElementById('th-temp-max')?.value)
+    },
+    aire: {
+      min: Number(document.getElementById('th-aire-min')?.value),
+      max: Number(document.getElementById('th-aire-max')?.value)
+    },
+    tierra: {
+      min: Number(document.getElementById('th-tierra-min')?.value),
+      max: Number(document.getElementById('th-tierra-max')?.value)
+    }
+  };
+
+  try {
+    localStorage.setItem('cfg-thresholds', JSON.stringify(thresholds));
+    statusEl.textContent = 'Umbrales guardados.';
+    statusEl.style.color = 'var(--success)';
+  } catch (_) {
+    statusEl.textContent = 'No se pudo guardar los umbrales.';
+    statusEl.style.color = 'var(--error)';
+  }
+}
+
+function onDashboardRefreshChange() {
+  const select = document.getElementById('cfg-dashboard-refresh');
+  if (!select) return;
+
+  AUTO_REFRESH_INTERVAL_MS = Number(select.value) || 30000;
+  stopAutoRefresh();
+  if (token && device) startAutoRefresh();
+}
+
+function loadDeviceLogs() {
+  const consoleEl = document.getElementById('log-console');
+  const statusEl = document.getElementById('log-status');
+  if (!consoleEl || !statusEl) return;
+
+  if (!token || !device) {
+    consoleEl.innerHTML = '<div class="log-empty">Inicia sesión para ver los logs.</div>';
+    statusEl.textContent = '';
+    return;
+  }
+
+  statusEl.textContent = 'Cargando logs...';
+  consoleEl.innerHTML = '<div class="log-empty">Cargando...</div>';
+
+  fetch(`${API_URL}/api/dispositivo/${device}/logs`, { headers: { Authorization: 'Bearer ' + token } })
+    .then(resp => {
+      if (!resp.ok) throw new Error('No se pudo cargar');
+      return resp.json();
+    })
+    .then(data => {
+      let lines = [];
+      if (Array.isArray(data)) lines = data;
+      else if (Array.isArray(data.logs)) lines = data.logs;
+      else if (typeof data === 'string') lines = data.split('\n');
+      else if (data && typeof data === 'object') lines = [JSON.stringify(data, null, 2)];
+      if (!lines.length) lines = ['No hay logs disponibles.'];
+      consoleEl.innerHTML = lines.map(line => `<div class="log-line">${String(line)}</div>`).join('');
+      statusEl.textContent = 'Logs actualizados';
+      if (document.getElementById('log-autoscroll')?.checked) consoleEl.scrollTop = consoleEl.scrollHeight;
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    })
+    .catch(() => {
+      consoleEl.innerHTML = '<div class="log-empty">No fue posible cargar los logs.</div>';
+      statusEl.textContent = '';
+    });
 }
 
 function setButtonLoading(buttonId, isLoading) {
