@@ -10,6 +10,7 @@
 /* ── TOKENS ─────────────────────────────────────────────── */
 :root {
   --soil:       #3d2b1f;
+  --soil-light: #4f3a2c;
   --leaf:       #2d6a4f;
   --leaf-mid:   #40916c;
   --leaf-light: #74c69d;
@@ -24,9 +25,11 @@
   --text-soft:  #5c5248;
   --error:      #c0392b;
   --error-bg:   #fdf2f0;
+  --warn:       #b9770e;
+  --warn-bg:    #fdf3e3;
   --success:    #1b7a50;
   --success-bg: #edfaf3;
-  --sidebar-w:  220px;
+  --sidebar-w:  230px;
   --radius:     14px;
   --shadow:     0 2px 12px rgba(61,43,31,0.10);
   --shadow-lg:  0 8px 32px rgba(61,43,31,0.13);
@@ -68,645 +71,257 @@ body {
     radial-gradient(circle at 80% 20%, rgba(45,106,79,0.40) 0%, transparent 50%);
 }
 
-.auth-logo {
-  position: relative;
-  z-index: 1;
-}
+.auth-logo { position: relative; z-index: 1; }
+.auth-logo-icon { font-size: 36px; line-height: 1; display: block; margin-bottom: 12px; }
+.auth-logo-text { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -0.03em; }
+.auth-logo-sub { font-size: 14px; color: rgba(255,255,255,0.65); margin-top: 4px; }
 
-.auth-logo-icon {
-  font-size: 36px;
-  line-height: 1;
-  display: block;
-  margin-bottom: 12px;
-}
+.auth-stats { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 20px; }
+.auth-stat-label { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.10em; margin-bottom: 4px; }
+.auth-stat-val { font-size: 22px; font-weight: 700; color: #fff; }
 
-.auth-logo-text {
-  font-size: 26px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: -0.03em;
-}
-
-.auth-logo-sub {
-  font-size: 14px;
-  color: rgba(255,255,255,0.65);
-  margin-top: 4px;
-}
-
-.auth-stats {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.auth-stat-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(255,255,255,0.55);
-  text-transform: uppercase;
-  letter-spacing: 0.10em;
-  margin-bottom: 4px;
-}
-
-.auth-stat-val {
-  font-size: 22px;
-  font-weight: 700;
-  color: #fff;
-}
-
-.auth-panel {
-  background: var(--cream);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 40px;
-}
-
-.auth-box {
-  width: 100%;
-  max-width: 400px;
-}
-
-.auth-box-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 6px;
-}
-
-.auth-box-sub {
-  font-size: 14px;
-  color: var(--muted);
-  margin-bottom: 28px;
-}
+.auth-panel { background: var(--cream); display: flex; align-items: center; justify-content: center; padding: 48px 40px; }
+.auth-box { width: 100%; max-width: 400px; }
+.auth-box-title { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.auth-box-sub { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
 
 /* Tabs */
-.tab-bar {
-  display: flex;
-  gap: 4px;
-  background: var(--parchment);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 4px;
-  margin-bottom: 28px;
-}
-
-.tab-btn {
-  flex: 1;
-  padding: 9px 12px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--muted);
-  cursor: pointer;
-  transition: background 0.18s, color 0.18s;
-}
-
-.tab-btn.active {
-  background: #fff;
-  color: var(--leaf);
-  font-weight: 700;
-  box-shadow: 0 1px 4px rgba(61,43,31,0.10);
-}
-
+.tab-bar { display: flex; gap: 4px; background: var(--parchment); border: 1px solid var(--border); border-radius: 10px; padding: 4px; margin-bottom: 28px; }
+.tab-btn { flex: 1; padding: 9px 12px; border: none; border-radius: 8px; background: transparent; font-family: inherit; font-size: 14px; font-weight: 500; color: var(--muted); cursor: pointer; transition: background 0.18s, color 0.18s; }
+.tab-btn.active { background: #fff; color: var(--leaf); font-weight: 700; box-shadow: 0 1px 4px rgba(61,43,31,0.10); }
 .tab-btn:hover:not(.active) { color: var(--text); }
 
 /* Form */
 .form-content { display: none; }
 .form-content.active { display: block; }
-
 .form-group { margin-bottom: 16px; }
-
-.form-group label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-soft);
-  margin-bottom: 6px;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  font-family: inherit;
-  font-size: 14px;
-  background: #fff;
-  color: var(--text);
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-soft); margin-bottom: 6px; }
+.form-group input, .form-group select {
+  width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: var(--radius);
+  font-family: inherit; font-size: 14px; background: #fff; color: var(--text);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--leaf-mid); box-shadow: 0 0 0 3px rgba(64,145,108,0.15); }
+.form-group input.error { border-color: var(--error); background: var(--error-bg); }
+.form-hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
-.form-group input:focus {
-  outline: none;
-  border-color: var(--leaf-mid);
-  box-shadow: 0 0 0 3px rgba(64,145,108,0.15);
-}
-
-.form-group input.error {
-  border-color: var(--error);
-  background: var(--error-bg);
-}
-
-.error-msg {
-  font-size: 12px;
-  color: var(--error);
-  margin-top: 6px;
-  display: none;
-}
-
+.error-msg { font-size: 12px; color: var(--error); margin-top: 6px; display: none; }
 .error-msg.show { display: block; }
 
-.success-box {
-  background: var(--success-bg);
-  border: 1px solid rgba(27,122,80,0.25);
-  color: var(--success);
-  padding: 14px;
-  border-radius: var(--radius);
-  font-size: 14px;
-  margin-bottom: 16px;
-  display: none;
-}
-
+.success-box { background: var(--success-bg); border: 1px solid rgba(27,122,80,0.25); color: var(--success); padding: 14px; border-radius: var(--radius); font-size: 14px; margin-bottom: 16px; display: none; }
 .success-box.show { display: block; }
 
 .btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 18px;
-  border: none;
-  border-radius: var(--radius);
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 18px; border: none; border-radius: var(--radius); font-family: inherit;
+  font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
 }
-
-.btn-primary {
-  width: 100%;
-  background: var(--leaf);
-  color: #fff;
-}
-
+.btn-primary { width: 100%; background: var(--leaf); color: #fff; }
 .btn-primary:hover { background: var(--leaf-mid); transform: translateY(-1px); box-shadow: var(--shadow); }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
-
-.btn-secondary {
-  background: var(--parchment);
-  color: var(--text-soft);
-  border: 1px solid var(--border);
-  font-size: 13px;
-}
-
+.btn-secondary { background: var(--parchment); color: var(--text-soft); border: 1px solid var(--border); font-size: 13px; }
 .btn-secondary:hover { background: var(--border); }
-
-.btn-danger {
-  background: #fff;
-  color: var(--error);
-  border: 1px solid #e8c4c0;
-  font-size: 13px;
-}
-
+.btn-danger { background: #fff; color: var(--error); border: 1px solid #e8c4c0; font-size: 13px; }
 .btn-danger:hover { background: var(--error-bg); }
 
-.spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255,255,255,0.4);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.65s linear infinite;
-}
-
+.spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.65s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── DASHBOARD LAYOUT ────────────────────────────────────── */
-#dash {
-  display: none;
-  min-height: 100vh;
-  animation: fadeIn 0.35s ease;
-}
-
+#dash { display: none; min-height: 100vh; animation: fadeIn 0.35s ease; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
 
-/* Sidebar + main split */
-.dash-layout {
-  display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr;
-  min-height: 100vh;
-}
+.dash-layout { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
 
 /* SIDEBAR */
-.sidebar {
-  background: var(--soil);
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-}
+.sidebar { background: var(--soil); display: flex; flex-direction: column; padding: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 
-.sidebar-brand {
-  padding: 28px 20px 24px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-}
+.sidebar-brand { padding: 28px 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 10px; }
+.sidebar-icon { font-size: 28px; line-height: 1; }
+.sidebar-name { font-size: 17px; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+.sidebar-sub { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
 
-.sidebar-icon { font-size: 28px; display: block; margin-bottom: 8px; }
+.sidebar-section { padding: 20px 20px 8px; font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.12em; }
 
-.sidebar-name {
-  font-size: 17px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: -0.02em;
-}
+.sidebar-device { margin: 0 12px 4px; background: rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; }
+.sidebar-device-label { font-size: 10px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.10em; }
+.sidebar-device-name { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--leaf-light); margin-top: 3px; word-break: break-all; }
 
-.sidebar-sub {
-  font-size: 12px;
-  color: rgba(255,255,255,0.45);
-  margin-top: 2px;
-}
-
-.sidebar-section {
-  padding: 20px 12px 8px;
-  font-size: 10px;
-  font-weight: 700;
-  color: rgba(255,255,255,0.3);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-
-.sidebar-device {
-  margin: 0 12px 4px;
-  background: rgba(255,255,255,0.08);
-  border-radius: 10px;
-  padding: 12px;
-}
-
-.sidebar-device-label {
-  font-size: 10px;
-  color: rgba(255,255,255,0.4);
-  text-transform: uppercase;
-  letter-spacing: 0.10em;
-}
-
-.sidebar-device-name {
-  font-family: 'DM Mono', monospace;
-  font-size: 13px;
-  color: var(--leaf-light);
-  margin-top: 3px;
-  word-break: break-all;
-}
-
-.sidebar-status {
-  margin: 8px 12px 0;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  color: rgba(255,255,255,0.55);
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
+.sidebar-status { margin: 8px 12px 0; display: flex; align-items: center; gap: 7px; font-size: 13px; color: rgba(255,255,255,0.55); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .status-dot.online { background: var(--leaf-light); box-shadow: 0 0 0 3px rgba(116,198,157,0.25); }
 .status-dot.offline { background: #e74c3c; }
 
-.sidebar-bottom {
-  margin-top: auto;
-  padding: 16px 12px;
-  border-top: 1px solid rgba(255,255,255,0.08);
+/* Nav menu */
+.nav-menu { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; }
+.nav-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 11px 12px; border-radius: 10px;
+  color: rgba(255,255,255,0.62);
+  font-size: 14px; font-weight: 500;
+  cursor: pointer; border: none; background: transparent;
+  width: 100%; text-align: left; font-family: inherit;
+  transition: background 0.16s, color 0.16s;
 }
+.nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.nav-item.active { background: var(--leaf); color: #fff; }
+.nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+
+.nav-sub { display: flex; flex-direction: column; gap: 2px; padding: 2px 0 4px 31px; }
+.nav-sub.collapsed { display: none; }
+.nav-sub-item {
+  padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500;
+  color: rgba(255,255,255,0.45); cursor: pointer; border: none; background: transparent;
+  text-align: left; font-family: inherit; width: 100%; transition: background 0.16s, color 0.16s;
+}
+.nav-sub-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
+.nav-sub-item.active { color: var(--leaf-light); font-weight: 700; }
+
+.sidebar-bottom { margin-top: auto; padding: 16px 12px; border-top: 1px solid rgba(255,255,255,0.08); }
 
 /* MAIN */
-.main {
-  padding: 32px 36px;
-  overflow-y: auto;
-}
+.main { padding: 32px 36px; overflow-y: auto; }
 
-/* Top bar */
-.main-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 28px;
-}
+.main-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 14px; }
+.main-title { font-size: 20px; font-weight: 700; color: var(--text); }
+.main-meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.topbar-actions { display: flex; gap: 10px; align-items: center; }
 
-.main-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.main-meta {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
-.topbar-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
+/* View visibility */
+.view { display: none; }
+.view.active { display: block; animation: fadeIn 0.25s ease; }
 
 /* KPI row */
-.kpi-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 16px;
-  margin-bottom: 28px;
-}
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
+.kpi { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+.kpi-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.10em; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+.kpi-value { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; font-feature-settings: "tnum"; }
+.kpi-sub { font-size: 12px; color: var(--muted); margin-top: 5px; }
 
-.kpi {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
-  box-shadow: var(--shadow);
-}
-
-.kpi-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.10em;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.kpi-value {
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1;
-  font-feature-settings: "tnum";
-}
-
-.kpi-sub {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 5px;
-}
+/* Section headers */
+.section-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.section-title { font-size: 15px; font-weight: 700; color: var(--text); }
 
 /* Readings grid */
-.section-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-
-.section-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-#grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 14px;
-  margin-bottom: 28px;
-}
-
+#grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-bottom: 28px; }
 .reading-card {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px 18px 16px;
-  box-shadow: var(--shadow);
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px 18px 16px; box-shadow: var(--shadow);
   transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-  position: relative;
-  overflow: hidden;
+  position: relative; overflow: hidden;
 }
-
-.reading-card::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 4px;
-  border-radius: var(--radius) 0 0 var(--radius);
-}
-
+.reading-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: var(--radius) 0 0 var(--radius); }
 .reading-card.temp::before  { background: var(--sun-deep); }
 .reading-card.aire::before  { background: var(--sky); }
 .reading-card.tierra::before { background: var(--leaf-mid); }
 .reading-card.other::before  { background: var(--border); }
-
-.reading-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--leaf-light);
-}
-
-.reading-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  margin-bottom: 8px;
-}
-
-.reading-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text);
-  font-feature-settings: "tnum";
-  line-height: 1;
-}
+.reading-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: var(--leaf-light); }
+.reading-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 8px; }
+.reading-value { font-size: 28px; font-weight: 700; color: var(--text); font-feature-settings: "tnum"; line-height: 1; }
 
 /* Chart card */
-.chart-card {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 22px;
-  box-shadow: var(--shadow);
-  margin-bottom: 28px;
-}
+.chart-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow); margin-bottom: 28px; }
+.chart-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+.chart-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.chart-legend { display: flex; gap: 14px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
-.chart-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
-  flex-wrap: wrap;
-  gap: 10px;
+.chart-range-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+.range-btn {
+  padding: 7px 14px; border: 1.5px solid var(--border); border-radius: 999px;
+  background: var(--cream); color: var(--text-soft); font-family: inherit;
+  font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s;
 }
-
-.chart-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.chart-legend {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
+.range-btn:hover { border-color: var(--leaf-light); }
+.range-btn.active { background: var(--leaf); color: #fff; border-color: var(--leaf); }
 
 /* Chart canvas wrapper: fixed height avoids Chart.js collapse */
-.chart-wrap {
-  position: relative;
-  height: 240px;
-  width: 100%;
-}
-
-#trend-chart {
-  position: absolute;
-  inset: 0;
-  width: 100% !important;
-  height: 100% !important;
-}
+.chart-wrap { position: relative; height: 280px; width: 100%; }
+#trend-chart { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
 
 /* History table card */
-.history-card {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 22px;
-  box-shadow: var(--shadow);
-  margin-bottom: 28px;
-}
+.history-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow); margin-bottom: 28px; }
+.history-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--parchment); }
+.filter-select, .filter-input { padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: var(--cream); color: var(--text); }
+.filter-select:focus, .filter-input:focus { outline: none; border-color: var(--leaf-mid); }
+#history-source { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
 
-.history-filters {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--parchment);
-}
-
-.filter-select, .filter-input {
-  padding: 8px 12px;
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 13px;
-  background: var(--cream);
-  color: var(--text);
-}
-
-.filter-select:focus, .filter-input:focus {
-  outline: none;
-  border-color: var(--leaf-mid);
-}
-
-#history-source {
-  font-size: 12px;
-  color: var(--muted);
-  font-family: 'DM Mono', monospace;
-}
-
-.history-table-wrap {
-  overflow: auto;
-  max-height: 380px;
-  border-radius: 8px;
-  border: 1px solid var(--parchment);
-}
-
-#history-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-#history-table thead {
-  position: sticky;
-  top: 0;
-  background: var(--parchment);
-  z-index: 2;
-}
-
-#history-table th {
-  padding: 10px 14px;
-  text-align: left;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-  border-bottom: 1px solid var(--border);
-}
-
-#history-table td {
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--parchment);
-  color: var(--text);
-  font-feature-settings: "tnum";
-}
-
+.history-table-wrap { overflow: auto; max-height: 380px; border-radius: 8px; border: 1px solid var(--parchment); }
+#history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#history-table thead { position: sticky; top: 0; background: var(--parchment); z-index: 2; }
+#history-table th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; border-bottom: 1px solid var(--border); }
+#history-table td { padding: 9px 14px; border-bottom: 1px solid var(--parchment); color: var(--text); font-feature-settings: "tnum"; }
 #history-table tbody tr:hover { background: #fdfaf7; }
 #history-table tbody tr:last-child td { border-bottom: none; }
 
 /* Status badge */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
+.status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; }
 .status-online  { background: #edfaf3; color: var(--success); }
 .status-offline { background: var(--error-bg); color: var(--error); }
 
 /* Admin section separator */
-.admin-sep {
-  border: 0;
-  border-top: 1px solid var(--border);
-  margin: 20px 0;
-}
+.admin-sep { border: 0; border-top: 1px solid var(--border); margin: 20px 0; }
+.admin-subtitle { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.10em; margin-bottom: 14px; }
 
-.admin-subtitle {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.10em;
-  margin-bottom: 14px;
+/* ── SETTINGS VIEW ───────────────────────────────────────── */
+.settings-tabs { display: flex; gap: 6px; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
+.settings-tab {
+  padding: 11px 18px; border: none; background: transparent; font-family: inherit;
+  font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer;
+  border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s;
 }
+.settings-tab.active { color: var(--leaf); border-bottom-color: var(--leaf); }
+.settings-tab:hover:not(.active) { color: var(--text); }
+
+.settings-panel { display: none; }
+.settings-panel.active { display: block; animation: fadeIn 0.2s ease; }
+
+.settings-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 22px; }
+.settings-card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.settings-card-desc { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+
+.settings-row { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.settings-field { flex: 1; min-width: 180px; }
+.settings-field label { display: block; font-size: 13px; font-weight: 600; color: var(--text-soft); margin-bottom: 6px; }
+.settings-field input, .settings-field select {
+  width: 100%; padding: 11px 13px; border: 1.5px solid var(--border); border-radius: 10px;
+  font-family: inherit; font-size: 14px; background: var(--cream); color: var(--text);
+}
+.settings-field input:focus, .settings-field select:focus { outline: none; border-color: var(--leaf-mid); }
+
+.settings-status { font-size: 13px; margin-top: 14px; display: none; }
+.settings-status.show { display: block; }
+.settings-status.ok   { color: var(--success); }
+.settings-status.err  { color: var(--error); }
+
+/* Threshold grid */
+.threshold-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.threshold-item { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--cream); }
+.threshold-item-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; }
+.threshold-range { display: flex; gap: 8px; align-items: center; }
+.threshold-range input { width: 100%; padding: 9px 10px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-family: inherit; background: #fff; }
+.threshold-range span { color: var(--muted); font-size: 12px; }
+
+/* Logs */
+.log-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.log-console {
+  background: var(--soil); border-radius: 12px; padding: 16px;
+  font-family: 'DM Mono', monospace; font-size: 12.5px; line-height: 1.7;
+  color: #d8d0c4; max-height: 420px; overflow-y: auto;
+}
+.log-line { display: flex; gap: 10px; padding: 2px 0; white-space: pre-wrap; word-break: break-word; }
+.log-time { color: rgba(255,255,255,0.35); flex-shrink: 0; }
+.log-level { flex-shrink: 0; font-weight: 700; width: 56px; }
+.log-level.info  { color: var(--sky); }
+.log-level.warn  { color: var(--sun); }
+.log-level.error { color: #f08a8a; }
+.log-level.ok    { color: var(--leaf-light); }
+.log-msg { color: #ece6dc; }
+.log-empty { color: var(--muted); text-align: center; padding: 30px; }
+
+.auto-scroll-toggle { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-soft); cursor: pointer; user-select: none; }
+.auto-scroll-toggle input { accent-color: var(--leaf); width: 16px; height: 16px; }
 
 /* ── MOBILE ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
@@ -715,37 +330,26 @@ body {
 
   .dash-layout { grid-template-columns: 1fr; }
 
-  .sidebar {
-    height: auto;
-    position: static;
-    flex-direction: row;
-    align-items: center;
-    padding: 12px 16px;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .sidebar-brand { padding: 0; border: none; display: flex; align-items: center; gap: 8px; }
-  .sidebar-icon { font-size: 20px; margin: 0; }
-  .sidebar-name { font-size: 15px; }
-  .sidebar-sub, .sidebar-section, .sidebar-device-label { display: none; }
-  .sidebar-device { margin: 0; padding: 6px 10px; }
-  .sidebar-status { margin: 0; }
-  .sidebar-bottom { margin: 0; padding: 0; border: none; }
+  .sidebar { height: auto; position: static; padding: 0; }
+  .sidebar-brand { padding: 14px 16px; }
+  .sidebar-sub { display: none; }
+  .sidebar-section { padding: 14px 16px 6px; }
+  .sidebar-device { margin: 0 12px 8px; }
+  .nav-menu { padding: 8px; }
 
   .main { padding: 18px 16px; }
   .main-topbar { flex-direction: column; align-items: flex-start; gap: 12px; }
 
   .kpi-row { grid-template-columns: 1fr 1fr; }
-
   #grid { grid-template-columns: 1fr 1fr; }
 
-  /* Stacked table on small screens */
   #history-table thead { display: none; }
   #history-table, #history-table tbody, #history-table tr, #history-table td { display: block; width: 100%; }
   #history-table tr { margin-bottom: 10px; border-bottom: 2px solid var(--parchment); }
   #history-table td { padding: 8px 10px; }
   #history-table td::before { content: attr(data-label); display: block; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 2px; }
+
+  .settings-row { flex-direction: column; align-items: stretch; }
 }
 
 @media (max-width: 420px) {
@@ -771,11 +375,11 @@ body {
       </div>
       <div>
         <div class="auth-stat-label">Actualización automática</div>
-        <div class="auth-stat-val">Cada 30 segundos</div>
+        <div class="auth-stat-val">Configurable desde el panel</div>
       </div>
       <div>
-        <div class="auth-stat-label">Historial con filtros</div>
-        <div class="auth-stat-val">Por hora, día o rango personalizado</div>
+        <div class="auth-stat-label">Diagnóstico</div>
+        <div class="auth-stat-val">Logs del dispositivo en vivo</div>
       </div>
     </div>
   </aside>
@@ -875,11 +479,27 @@ body {
         <div class="sidebar-device-label">ID</div>
         <div class="sidebar-device-name" id="device">—</div>
       </div>
-
       <div class="sidebar-status">
         <span class="status-dot offline" id="sidebar-dot"></span>
         <span id="sidebar-status-text">Offline</span>
       </div>
+
+      <div class="sidebar-section">Menú</div>
+      <nav class="nav-menu">
+        <button class="nav-item active" data-view="resumen" onclick="switchView('resumen')">
+          <span class="nav-icon">📋</span> Resumen
+        </button>
+        <button class="nav-item" data-view="tendencia" onclick="switchView('tendencia')">
+          <span class="nav-icon">📈</span> Tendencia &amp; Historial
+        </button>
+        <button class="nav-item" data-view="configuracion" onclick="switchView('configuracion')">
+          <span class="nav-icon">⚙️</span> Configuración
+        </button>
+        <div class="nav-sub collapsed" id="config-subnav">
+          <button class="nav-sub-item active" data-subview="general" onclick="switchConfigSubview('general')">General &amp; Umbrales</button>
+          <button class="nav-sub-item" data-subview="logs" onclick="switchConfigSubview('logs')">Logs del ESP32</button>
+        </div>
+      </nav>
 
       <div style="flex:1"></div>
 
@@ -903,79 +523,196 @@ body {
         </div>
       </div>
 
-      <!-- KPIs -->
-      <div class="kpi-row">
-        <div class="kpi">
-          <div class="kpi-label">⏱ Última lectura</div>
-          <div class="kpi-value" id="last-update" style="font-size:18px;">--</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">📡 Estado del sensor</div>
-          <div class="kpi-value" id="sensor-status">--</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">📊 Variables activas</div>
-          <div class="kpi-value" style="font-size:14px;padding-top:4px;">Temp · Aire · Tierra</div>
-        </div>
-      </div>
-
-      <!-- Readings -->
-      <div class="section-header">
-        <span class="section-title">Lecturas actuales</span>
-      </div>
-      <div id="grid"></div>
-
-      <!-- Trend chart -->
-      <div class="chart-card">
-        <div class="chart-card-header">
-          <div class="chart-title">Tendencia histórica</div>
-          <div class="chart-legend">
-            <div class="legend-item"><span class="legend-dot" style="background:#f4a261"></span>Temperatura</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#90e0ef"></span>Humedad aire</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#40916c"></span>Humedad tierra</div>
+      <!-- ── VIEW: RESUMEN ─────────────────────────────────── -->
+      <section class="view active" id="view-resumen">
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="kpi-label">⏱ Última lectura</div>
+            <div class="kpi-value" id="last-update" style="font-size:18px;">--</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">📡 Estado del sensor</div>
+            <div class="kpi-value" id="sensor-status">--</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">⏲ Frecuencia de medición</div>
+            <div class="kpi-value" id="kpi-interval" style="font-size:18px;">--</div>
           </div>
         </div>
-        <div class="chart-wrap">
-          <canvas id="trend-chart"></canvas>
-        </div>
-      </div>
 
-      <!-- History table -->
-      <div class="history-card">
-        <div class="chart-card-header">
-          <div class="chart-title">Historial de lecturas</div>
-          <span id="history-source" style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;"></span>
+        <div class="section-header">
+          <span class="section-title">Lecturas actuales</span>
+        </div>
+        <div id="grid"></div>
+      </section>
+
+      <!-- ── VIEW: TENDENCIA & HISTORIAL ──────────────────────── -->
+      <section class="view" id="view-tendencia">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div class="chart-title">Tendencia histórica</div>
+            <div class="chart-legend">
+              <div class="legend-item"><span class="legend-dot" style="background:#f4a261"></span>Temperatura</div>
+              <div class="legend-item"><span class="legend-dot" style="background:#90e0ef"></span>Humedad aire</div>
+              <div class="legend-item"><span class="legend-dot" style="background:#40916c"></span>Humedad tierra</div>
+            </div>
+          </div>
+          <div class="chart-range-bar" style="margin-bottom:16px;">
+            <button class="range-btn" data-range="3">3h</button>
+            <button class="range-btn" data-range="12">12h</button>
+            <button class="range-btn active" data-range="24">24h</button>
+            <button class="range-btn" data-range="72">3 días</button>
+            <button class="range-btn" data-range="0">Todo</button>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="trend-chart"></canvas>
+          </div>
         </div>
 
-        <div class="history-filters">
-          <select id="history-filter" class="filter-select">
-            <option value="all">Todo el historial</option>
-            <option value="last3">Últimas 3 horas</option>
-            <option value="today">Hoy</option>
-            <option value="custom">Rango personalizado</option>
-          </select>
-          <input id="filter-date" type="date" class="filter-input" style="display:none;" />
-          <input id="filter-from" type="time" class="filter-input" style="display:none;" />
-          <input id="filter-to"   type="time" class="filter-input" style="display:none;" />
-          <button id="filter-apply" class="btn btn-secondary">Aplicar</button>
-          <button id="filter-reset" class="btn btn-secondary">Restablecer</button>
+        <div class="history-card">
+          <div class="chart-card-header">
+            <div class="chart-title">Historial de lecturas</div>
+            <span id="history-source" style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;"></span>
+          </div>
+
+          <div class="history-filters">
+            <select id="history-filter" class="filter-select">
+              <option value="all">Todo el historial</option>
+              <option value="last3">Últimas 3 horas</option>
+              <option value="today">Hoy</option>
+              <option value="custom">Rango personalizado</option>
+            </select>
+            <input id="filter-date" type="date" class="filter-input" style="display:none;" />
+            <input id="filter-from" type="time" class="filter-input" style="display:none;" />
+            <input id="filter-to"   type="time" class="filter-input" style="display:none;" />
+            <button id="filter-apply" class="btn btn-secondary">Aplicar</button>
+            <button id="filter-reset" class="btn btn-secondary">Restablecer</button>
+          </div>
+
+          <div class="history-table-wrap">
+            <table id="history-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Hora</th>
+                  <th>🌱 Tierra</th>
+                  <th>☀️ Temperatura</th>
+                  <th>☁️ Humedad aire</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── VIEW: CONFIGURACIÓN ──────────────────────────────── -->
+      <section class="view" id="view-configuracion">
+
+        <!-- Sub-panel: General & Umbrales -->
+        <div class="settings-panel active" id="config-general">
+
+          <div class="settings-card">
+            <div class="settings-card-title">Frecuencia de medición</div>
+            <div class="settings-card-desc">Define cada cuánto tiempo el ESP32 toma y envía lecturas al servidor.</div>
+            <div class="settings-row">
+              <div class="settings-field">
+                <label for="cfg-interval-value">Intervalo</label>
+                <input id="cfg-interval-value" type="number" min="1" step="1" placeholder="Ej: 5">
+              </div>
+              <div class="settings-field">
+                <label for="cfg-interval-unit">Unidad</label>
+                <select id="cfg-interval-unit">
+                  <option value="seconds">Segundos</option>
+                  <option value="minutes" selected>Minutos</option>
+                  <option value="hours">Horas</option>
+                </select>
+              </div>
+              <div class="settings-field" style="flex:0 0 auto;">
+                <label>&nbsp;</label>
+                <button class="btn btn-primary" style="width:auto;" id="cfg-interval-save" onclick="saveMeasurementInterval()">Guardar</button>
+              </div>
+            </div>
+            <div class="form-hint">El cambio se aplica en la próxima sincronización del dispositivo (puede tardar hasta un ciclo en aplicarse).</div>
+            <div class="settings-status" id="cfg-interval-status"></div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-title">Umbrales de alerta</div>
+            <div class="settings-card-desc">Define rangos normales para cada variable. Fuera de estos rangos, las lecturas se destacan como anómalas.</div>
+
+            <div class="threshold-grid">
+              <div class="threshold-item">
+                <div class="threshold-item-title">☀️ Temperatura (°C)</div>
+                <div class="threshold-range">
+                  <input id="th-temp-min" type="number" step="0.1" placeholder="Mín">
+                  <span>—</span>
+                  <input id="th-temp-max" type="number" step="0.1" placeholder="Máx">
+                </div>
+              </div>
+              <div class="threshold-item">
+                <div class="threshold-item-title">☁️ Humedad aire (%)</div>
+                <div class="threshold-range">
+                  <input id="th-aire-min" type="number" step="0.1" placeholder="Mín">
+                  <span>—</span>
+                  <input id="th-aire-max" type="number" step="0.1" placeholder="Máx">
+                </div>
+              </div>
+              <div class="threshold-item">
+                <div class="threshold-item-title">🌱 Humedad tierra (%)</div>
+                <div class="threshold-range">
+                  <input id="th-tierra-min" type="number" step="0.1" placeholder="Mín">
+                  <span>—</span>
+                  <input id="th-tierra-max" type="number" step="0.1" placeholder="Máx">
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:18px;">
+              <button class="btn btn-primary" style="width:auto;" onclick="saveThresholds()">Guardar umbrales</button>
+            </div>
+            <div class="settings-status" id="cfg-thresholds-status"></div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-title">Refresco del panel</div>
+            <div class="settings-card-desc">Cada cuánto tiempo este dashboard consulta al servidor para refrescar la pantalla (no afecta al ESP32).</div>
+            <div class="settings-row">
+              <div class="settings-field" style="max-width:220px;">
+                <label for="cfg-dashboard-refresh">Refrescar cada</label>
+                <select id="cfg-dashboard-refresh" onchange="onDashboardRefreshChange()">
+                  <option value="15000">15 segundos</option>
+                  <option value="30000" selected>30 segundos</option>
+                  <option value="60000">1 minuto</option>
+                  <option value="300000">5 minutos</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="history-table-wrap">
-          <table id="history-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Hora</th>
-                <th>🌱 Tierra</th>
-                <th>☀️ Temperatura</th>
-                <th>☁️ Humedad aire</th>
-              </tr>
-            </thead>
-            <tbody id="history-tbody"></tbody>
-          </table>
+        <!-- Sub-panel: Logs -->
+        <div class="settings-panel" id="config-logs">
+          <div class="settings-card">
+            <div class="settings-card-title">Logs del dispositivo</div>
+            <div class="settings-card-desc">Eventos recientes del ESP32: conexiones, desconexiones, errores de sensor y envíos al servidor.</div>
+
+            <div class="log-toolbar">
+              <button class="btn btn-secondary" onclick="loadDeviceLogs()">↻ Actualizar logs</button>
+              <label class="auto-scroll-toggle">
+                <input type="checkbox" id="log-autoscroll" checked>
+                Auto-scroll
+              </label>
+              <span id="log-status" style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;"></span>
+            </div>
+
+            <div class="log-console" id="log-console">
+              <div class="log-empty">Sin logs cargados todavía. Presiona "Actualizar logs".</div>
+            </div>
+          </div>
         </div>
-      </div>
+
+      </section>
 
     </main>
   </div>
