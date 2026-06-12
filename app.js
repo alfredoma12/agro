@@ -13,6 +13,7 @@ let loadInterval    = null;
 let trendChart      = null;
 let trendHistory    = { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
 let trendHistoryRaw = [];
+let trendHistoryFullRange = null; // Guardará los datos completos para filtros de rango
 
 const HISTORY_STORAGE_KEY      = 'dashboard-history';
 let AUTO_REFRESH_INTERVAL_MS = 30000;
@@ -249,6 +250,55 @@ function updateTrendChartData() {
   trendChart.update();
 }
 
+function filterChartByRange(hours) {
+  // Si trendHistoryFullRange no está inicializado, hacerlo ahora
+  if (!trendHistoryFullRange) {
+    trendHistoryFullRange = JSON.parse(JSON.stringify(trendHistory));
+  }
+
+  // Si hours === 0, mostrar todo
+  if (hours === 0) {
+    trendHistory = JSON.parse(JSON.stringify(trendHistoryFullRange));
+  } else {
+    // Calcular la fecha límite (hace N horas)
+    const now = Date.now();
+    const limitMs = now - (hours * 60 * 60 * 1000);
+
+    // Filtrar los índices que cumplen con el rango
+    const indices = trendHistoryFullRange.timestamps
+      .map((ts, idx) => new Date(ts).getTime() >= limitMs ? idx : -1)
+      .filter(idx => idx !== -1);
+
+    // Construir los datos filtrados
+    trendHistory = {
+      timestamps: indices.map(idx => trendHistoryFullRange.timestamps[idx]),
+      temperatura: indices.map(idx => trendHistoryFullRange.temperatura[idx]),
+      humedad_aire: indices.map(idx => trendHistoryFullRange.humedad_aire[idx]),
+      humedad_tierra: indices.map(idx => trendHistoryFullRange.humedad_tierra[idx])
+    };
+  }
+
+  // Actualizar el gráfico
+  updateTrendChartData();
+
+  // Actualizar botones activos
+  document.querySelectorAll('.range-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (String(btn.dataset.range) === String(hours)) {
+      btn.classList.add('active');
+    }
+  });
+}
+
+function setupChartRangeButtons() {
+  document.querySelectorAll('.range-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const hours = parseInt(btn.dataset.range);
+      filterChartByRange(hours);
+    });
+  });
+}
+
 function createTrendChart() {
   const canvasEl = document.getElementById('trend-chart');
   if (!canvasEl) return;
@@ -467,6 +517,11 @@ function switchView(viewName) {
     configSubnav.classList.toggle('collapsed', viewName !== 'configuracion');
   }
 
+  // Reinicializar filtro de rango cuando se va a tendencia
+  if (viewName === 'tendencia') {
+    filterChartByRange(24); // Mostrar las últimas 24h por defecto
+  }
+
   if (viewName === 'configuracion') {
     switchConfigSubview(currentConfigSubview || 'general');
   } else {
@@ -509,6 +564,14 @@ function saveMeasurementInterval() {
   if (unit === 'minutes') intervalSeconds = value * 60;
   else if (unit === 'hours') intervalSeconds = value * 3600;
 
+  // Validar mínimo de 5 segundos
+  if (intervalSeconds < 5) {
+    statusEl.textContent = '❌ El intervalo mínimo es 5 segundos.';
+    statusEl.style.color = 'var(--error)';
+    statusEl.style.display = 'block';
+    return;
+  }
+
   // Intentar enviar al servidor
   if (token && device) {
     fetch(`${API_URL}/api/dispositivo/${device}/config`, {
@@ -517,7 +580,7 @@ function saveMeasurementInterval() {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + token
       },
-      body: JSON.stringify({ measurement_interval: intervalSeconds })
+      body: JSON.stringify({ intervalo_s: intervalSeconds })
     })
       .then(resp => {
         if (!resp.ok) throw new Error(`Error ${resp.status}`);
@@ -593,56 +656,17 @@ function saveThresholds() {
     return;
   }
 
-  // Intentar enviar al servidor
-  if (token && device) {
-    fetch(`${API_URL}/api/dispositivo/${device}/config`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
-      },
-      body: JSON.stringify({ thresholds })
-    })
-      .then(resp => {
-        if (!resp.ok) throw new Error(`Error ${resp.status}`);
-        return resp.json();
-      })
-      .then(data => {
-        statusEl.textContent = '✅ Umbrales actualizados correctamente.';
-        statusEl.style.color = 'var(--success)';
-        statusEl.style.display = 'block';
-        
-        // Guardar en localStorage como respaldo
-        try {
-          localStorage.setItem('cfg-thresholds', JSON.stringify(thresholds));
-        } catch (_) {}
-        
-        setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
-      })
-      .catch(err => {
-        console.error('Error al guardar umbrales:', err);
-        statusEl.textContent = '❌ No se pudo actualizar. Se guardó localmente.';
-        statusEl.style.color = 'var(--error)';
-        statusEl.style.display = 'block';
-        
-        // Guardar en localStorage como respaldo
-        try {
-          localStorage.setItem('cfg-thresholds', JSON.stringify(thresholds));
-        } catch (_) {}
-      });
-  } else {
-    // Si no hay sesión, solo guardar en localStorage
-    try {
-      localStorage.setItem('cfg-thresholds', JSON.stringify(thresholds));
-      statusEl.textContent = '✅ Umbrales guardados localmente.';
-      statusEl.style.color = 'var(--success)';
-      statusEl.style.display = 'block';
-      setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
-    } catch (_) {
-      statusEl.textContent = '❌ No se pudo guardar los umbrales.';
-      statusEl.style.color = 'var(--error)';
-      statusEl.style.display = 'block';
-    }
+  // Guardar en localStorage
+  try {
+    localStorage.setItem('cfg-thresholds', JSON.stringify(thresholds));
+    statusEl.textContent = '✅ Umbrales guardados correctamente.';
+    statusEl.style.color = 'var(--success)';
+    statusEl.style.display = 'block';
+    setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
+  } catch (_) {
+    statusEl.textContent = '❌ No se pudo guardar los umbrales.';
+    statusEl.style.color = 'var(--error)';
+    statusEl.style.display = 'block';
   }
 }
 
@@ -965,6 +989,9 @@ async function load() {
 
     saveChartHistory();
     if (!trendChart) createTrendChart();
+    
+    // Guardar datos completos para filtros de rango
+    trendHistoryFullRange = JSON.parse(JSON.stringify(trendHistory));
     updateTrendChartData();
 
   } catch (error) {
@@ -1178,6 +1205,7 @@ window.debugTelemetryHistory = debugTelemetryHistory;
 
 document.addEventListener('DOMContentLoaded', () => {
   setupHistoryFilterUI();
+  setupChartRangeButtons();
   if (token && device) {
     showDashboard();
     startAutoRefresh();
