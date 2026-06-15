@@ -354,6 +354,21 @@ body {
 .auto-scroll-toggle { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-soft); cursor: pointer; user-select: none; }
 .auto-scroll-toggle input { accent-color: var(--leaf); width: 16px; height: 16px; }
 
+/* Bluetooth */
+.ble-status-line { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-soft); margin-bottom: 16px; }
+.ble-status-ok { color: var(--success); }
+.ble-status-err { color: var(--error); }
+.ble-status-info { color: var(--muted); }
+.ble-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.ble-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.ble-metric { background: var(--cream); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.ble-metric-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.ble-metric-value { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 700; color: var(--text); word-break: break-word; }
+.ble-status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.ble-status-item { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--parchment); border-radius: 10px; background: #fff; font-size: 13px; }
+.ble-status-item span:first-child { color: var(--muted); }
+.ble-status-item span:last-child { font-family: 'DM Mono', monospace; color: var(--text); text-align: right; word-break: break-word; }
+
 /* ── PWA INSTALL MODAL ───────────────────────────────────── */
 #pwa-install-modal {
   position: fixed; inset: 0; z-index: 1000;
@@ -546,6 +561,10 @@ body {
         <button class="nav-item" data-view="tendencia" onclick="switchView('tendencia')">
           <span class="nav-icon">📈</span> Tendencia &amp; Historial
         </button>
+        <button class="nav-item" data-view="bluetooth" onclick="switchView('bluetooth')">
+          <span class="nav-icon">🔵</span> Bluetooth
+          <span class="status-dot offline" id="ble-sidebar-dot" style="margin-left:auto;"></span>
+        </button>
         <button class="nav-item" data-view="configuracion" onclick="switchView('configuracion')">
           <span class="nav-icon">⚙️</span> Configuración
         </button>
@@ -661,6 +680,112 @@ body {
               </thead>
               <tbody id="history-tbody"></tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── VIEW: BLUETOOTH ───────────────────────────────── -->
+      <section class="view" id="view-bluetooth">
+        <div class="settings-card">
+          <div class="settings-card-title">Bluetooth local</div>
+          <div class="settings-card-desc">Conecta directo con el ESP32 cuando quieras revisar lecturas, estado y logs sin depender del servidor.</div>
+
+          <div class="ble-status-line">
+            <span class="status-dot offline" id="ble-dot"></span>
+            <span id="ble-dot-text">Desconectado</span>
+            <span id="ble-conn-status" class="ble-status-info">Listo para conectar.</span>
+          </div>
+
+          <div class="ble-actions">
+            <button class="btn btn-primary" style="width:auto;" id="ble-connect-btn" type="button">Conectar</button>
+            <button class="btn btn-danger" style="display:none;" id="ble-disconnect-btn" type="button">Desconectar</button>
+            <button class="btn btn-secondary" id="ble-refresh-btn" type="button">Actualizar</button>
+          </div>
+
+          <div id="ble-data-panels" style="display:none;">
+            <div class="section-header">
+              <span class="section-title">Lectura por Bluetooth</span>
+              <span id="ble-last-update" style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;">--</span>
+            </div>
+
+            <div class="ble-grid">
+              <div class="ble-metric">
+                <div class="ble-metric-label">Temperatura</div>
+                <div class="ble-metric-value" id="ble-temp">--</div>
+              </div>
+              <div class="ble-metric">
+                <div class="ble-metric-label">Humedad aire</div>
+                <div class="ble-metric-value" id="ble-hum-aire">--</div>
+              </div>
+              <div class="ble-metric">
+                <div class="ble-metric-label">Humedad suelo</div>
+                <div class="ble-metric-value" id="ble-hum-suelo">--</div>
+              </div>
+              <div class="ble-metric">
+                <div class="ble-metric-label">Suelo bruto</div>
+                <div class="ble-metric-value" id="ble-soil-raw">--</div>
+              </div>
+              <div class="ble-metric">
+                <div class="ble-metric-label">RSSI</div>
+                <div class="ble-metric-value" id="ble-rssi">--</div>
+              </div>
+              <div class="ble-metric">
+                <div class="ble-metric-label">Intervalo</div>
+                <div class="ble-metric-value" id="ble-interval">--</div>
+              </div>
+              <div class="ble-metric">
+                <div class="ble-metric-label">Timestamp ESP32</div>
+                <div class="ble-metric-value" id="ble-ts">--</div>
+              </div>
+            </div>
+
+            <div class="settings-card" style="box-shadow:none;margin-bottom:18px;">
+              <div class="settings-card-title">Estado del dispositivo</div>
+              <div class="settings-card-desc">Diagnóstico reportado por el firmware vía Bluetooth.</div>
+              <div class="ble-status-grid">
+                <div class="ble-status-item"><span>WiFi</span><span id="ble-st-wifi">--</span></div>
+                <div class="ble-status-item"><span>Badge WiFi</span><span id="ble-st-wifi-badge" class="status-badge status-offline">--</span></div>
+                <div class="ble-status-item"><span>MQTT</span><span id="ble-st-mqtt">--</span></div>
+                <div class="ble-status-item"><span>RSSI WiFi</span><span id="ble-st-rssi">--</span></div>
+                <div class="ble-status-item"><span>Intentos WiFi</span><span id="ble-st-intentos">--</span></div>
+                <div class="ble-status-item"><span>Memoria libre</span><span id="ble-st-heap">--</span></div>
+                <div class="ble-status-item"><span>Hora local</span><span id="ble-st-hora">--</span></div>
+                <div class="ble-status-item"><span>Zona horaria</span><span id="ble-st-tz">--</span></div>
+                <div class="ble-status-item"><span>MAC</span><span id="ble-st-mac">--</span></div>
+                <div class="ble-status-item"><span>Device ID</span><span id="ble-st-device">--</span></div>
+                <div class="ble-status-item"><span>Intervalo firmware</span><span id="ble-st-interval">--</span></div>
+              </div>
+            </div>
+
+            <div class="settings-card" style="box-shadow:none;margin-bottom:18px;">
+              <div class="settings-card-title">Frecuencia por Bluetooth</div>
+              <div class="settings-row">
+                <div class="settings-field">
+                  <label for="ble-cfg-interval-value">Intervalo</label>
+                  <input id="ble-cfg-interval-value" type="number" min="1" step="1" placeholder="Ej: 30">
+                </div>
+                <div class="settings-field">
+                  <label for="ble-cfg-interval-unit">Unidad</label>
+                  <select id="ble-cfg-interval-unit">
+                    <option value="seconds" selected>Segundos</option>
+                    <option value="minutes">Minutos</option>
+                    <option value="hours">Horas</option>
+                  </select>
+                </div>
+                <div class="settings-field" style="flex:0 0 auto;">
+                  <label>&nbsp;</label>
+                  <button class="btn btn-primary" style="width:auto;" id="ble-cfg-save" type="button">Enviar</button>
+                </div>
+              </div>
+              <div class="settings-status" id="ble-cfg-status"></div>
+            </div>
+
+            <div class="settings-card" style="box-shadow:none;margin-bottom:0;">
+              <div class="settings-card-title">Log WiFi por Bluetooth</div>
+              <div class="log-console" id="ble-log-console">
+                <div class="log-empty">Conecta el dispositivo para ver el log WiFi.</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
