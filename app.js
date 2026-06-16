@@ -1675,7 +1675,189 @@ function setupPwaInstallPrompt() {
 //  Requisitos del navegador: Chrome/Edge (escritorio y Android) con Web Bluetooth.
 //  NO soportado en iOS Safari — limitación del navegador, no del firmware.
 // ════════════════════════════════════════════════════════════════════════════
+async function bleConnect() {
+  if (!bleSupported()) {
+    bleSetStatusMsg(
+      'Tu navegador no soporta Web Bluetooth. Usa Chrome o Edge (escritorio o Android).',
+      'err'
+    );
+    return;
+  }
 
+  let bleDevice = null;
+
+  // ── Intento 1: filtro estricto por UUID de servicio ──────────────────────
+  // Es lo correcto, pero algunos firmwares NimBLE no incluyen el UUID completo
+  // (128 bits) en el paquete de advertising por espacio, así que puede fallar.
+  try {
+    bleSetStatusMsg('Buscando dispositivos AgroSensor (filtro UUID)…', 'info');
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [BLE_SERVICE_UUID] }],
+      optionalServices: [BLE_SERVICE_UUID]
+    });
+  } catch (e1) {
+    if (e1.name === 'NotFoundError') {
+      // El usuario canceló el diálogo — no seguir intentando.
+      bleSetStatusMsg('No se seleccionó ningún dispositivo.', 'err');
+      bleUpdateConnectedUI(false);
+      return;
+    }
+    // Cualquier otro error (SecurityError, etc.) → probar siguiente estrategia
+    console.warn('[BLE] Intento 1 (UUID filter) falló:', e1.message);
+  }
+
+  // ── Intento 2: filtro por prefijo de nombre ───────────────────────────────
+  // NimBLE siempre incluye el nombre completo en el advertising, así que esto
+  // suele funcionar cuando el UUID no aparece.
+  if (!bleDevice) {
+    try {
+      bleSetStatusMsg('Buscando dispositivos AgroSensor (filtro nombre)…', 'info');
+      bleDevice = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: 'AgroSensor-' }],
+        optionalServices: [BLE_SERVICE_UUID]
+      });
+    } catch (e2) {
+      if (e2.name === 'NotFoundError') {
+        bleSetStatusMsg('No se seleccionó ningún dispositivo.', 'err');
+        bleUpdateConnectedUI(false);
+        return;
+      }
+      console.warn('[BLE] Intento 2 (name prefix) falló:', e2.message);
+    }
+  }
+
+  // ── Intento 3: escaneo abierto (acceptAllDevices) ─────────────────────────
+  // Último recurso: el usuario ve TODOS los dispositivos BLE cercanos y elige.
+  // Chrome muestra una advertencia de seguridad, pero funciona.
+  if (!bleDevice) {
+    try {
+      bleSetStatusMsg('Abriendo selector de todos los dispositivos BLE…', 'info');
+      bleDevice = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: [BLE_SERVICE_UUID]
+      });
+    } catch (e3) {
+      if (e3.name === 'NotFoundError') {
+        bleSetStatusMsg('No se seleccionó ningún dispositivo.', 'err');
+      } else {
+        bleSetStatusMsg(`❌ Error al conectar: ${e3.message || e3}`, 'err');
+      }
+      bleUpdateConnectedUI(false);
+      return;
+    }
+  }
+
+  // ── A partir de aquí tenemos un dispositivo seleccionado ─────────────────
+  // Verificar que sea realmente un AgroSensor antes de continuar
+  const deviceName = bleDevice.name || '';
+  if (deviceName && !deviceName.startsWith('AgroSensor-') && !deviceName.includes('Agro')) {
+    const confirmed = confirm(
+      `El dispositivo seleccionado se llama "${deviceName}".\n` +
+      `¿Es tu AgroSensor? (esperado: "AgroSensor-XXXX")`
+    );
+    if (!confirmed) {
+      bleSetStatusMsg('Conexión cancelada por el usuario.', 'info');
+      bleUpdateConnectedUI(false);
+      return;
+    }
+  }
+
+  BLE_STATE.device = bleDevice;
+  bleDevice.addEventListener('gattserverdisconnected', onBleDisconnected);
+
+  try {
+    bleSetStatusMsg(`Conectando a ${deviceName || 'dispositivo'}…`, 'info');
+    const server = await bleDevice.gatt.connect();
+    BLE_STATE.server = server;
+
+    // Obtener el servicio principal — aquí es donde realmente verificamos
+    // que el dispositivo expone el UUID correcto.
+    let service;
+    try {
+      service = await server.getPrimaryService(BLE_SERVICE_UUID);
+    } catch (svcErr) {
+      bleSetStatusMsg(
+        `❌ El dispositivo no expone el servicio AgroSensor. ` +
+        `Verifica que el firmware esté corriendo. (${svcErr.message})`,
+        'err'
+      );
+      bleDevice.gatt.disconnect();
+      bleUpdateConnectedUI(false);
+      return;
+    }
+
+    // ── Obtener características ───────────────────────────────────────────
+    BLE_STATE.charTelemetry = await service.getCharacteristic(BLE_CHAR_TELEMETRY_UUID);
+    BLE_STATE.charStatus = await service.getCharacteristic(BLE_CHAR_STATUS_UUID);
+    BLE_STATE.charConfig = await service.getCharacteristic(BLE_CHAR_CONFIG_UUID);
+
+    try {
+      BLE_STATE.charHeartbeat = await service.getCharacteristic(BLE_CHAR_HEARTBEAT_UUID);
+    } catch (_) {
+      BLE_STATE.charHeartbeat = null;
+    }
+
+    try {
+      BLE_STATE.charWifiLog = await service.getCharacteristic(BLE_CHAR_WIFILOG_UUID);
+    } catch (_) {
+      BLE_STATE.charWifiLog = null;
+      console.warn('[BLE] WiFi log char no disponible (firmware < v2.2)');
+    }
+
+    // ── Suscribir notificaciones ──────────────────────────────────────────
+    await BLE_STATE.charTelemetry.startNotifications();
+    BLE_STATE.charTelemetry.addEventListener('characteristicvaluechanged', ev => {
+      bleHandleTelemetry(ev.target.value);
+    });
+
+    if (BLE_STATE.charWifiLog) {
+      try {
+        await BLE_STATE.charWifiLog.startNotifications();
+        BLE_STATE.charWifiLog.addEventListener('characteristicvaluechanged', ev => {
+          bleHandleWifiLog(ev.target.value);
+        });
+      } catch (_) { }
+    }
+
+    if (BLE_STATE.charHeartbeat) {
+      try {
+        await BLE_STATE.charHeartbeat.startNotifications();
+        BLE_STATE.charHeartbeat.addEventListener('characteristicvaluechanged', ev => {
+          bleHandleHeartbeat(ev.target.value);
+        });
+      } catch (_) { }
+    }
+
+    // ── Conectado ─────────────────────────────────────────────────────────
+    bleUpdateConnectedUI(true);
+    bleMarkHeartbeat('BLE');
+    bleStartRuntimeMonitors();
+    bleSetStatusMsg(`✅ Conectado a ${deviceName || 'AgroSensor'}.`, 'ok');
+
+    // Lecturas iniciales
+    await bleReadHeartbeat();
+    await bleReadTelemetry();
+    await bleReadStatus();
+    await bleReadWifiLog();
+    await bleFetchHttpStatus();
+
+    // Poll periódico de estado + log
+    if (BLE_STATE.statusPollTimer) clearInterval(BLE_STATE.statusPollTimer);
+    BLE_STATE.statusPollTimer = setInterval(() => {
+      if (BLE_STATE.connected) {
+        bleReadHeartbeat();
+        bleReadStatus();
+        bleReadWifiLog();
+        bleFetchHttpStatus();
+      }
+    }, 10000);
+
+  } catch (connErr) {
+    console.error('[BLE] Error al conectar GATT:', connErr);
+    bleSetStatusMsg(`❌ Error: ${connErr.message || connErr}`, 'err');
+    bleUpdateConnectedUI(false);
+  }
+}
 const BLE_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const BLE_CHAR_TELEMETRY_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // READ + NOTIFY
 const BLE_CHAR_STATUS_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // READ
