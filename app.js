@@ -1,21 +1,21 @@
 const API_URL = "https://reception-holland-tcp-defensive.trycloudflare.com";
 
 // ── BUG FIX: leer token/device de localStorage de forma segura
-let token  = null;
+let token = null;
 let device = null;
 
 try {
-  token  = localStorage.getItem("token");
+  token = localStorage.getItem("token");
   device = localStorage.getItem("device");
 } catch (_) { /* entorno sin localStorage */ }
 
-let loadInterval    = null;
-let trendChart      = null;
-let trendHistory    = { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
+let loadInterval = null;
+let trendChart = null;
+let trendHistory = { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
 let trendHistoryRaw = [];
 let trendHistoryFullRange = null; // Guardará los datos completos para filtros de rango
 
-const HISTORY_STORAGE_KEY      = 'dashboard-history';
+const HISTORY_STORAGE_KEY = 'dashboard-history';
 let AUTO_REFRESH_INTERVAL_MS = 30000;
 let currentConfigSubview = 'general';
 let currentView = 'resumen';
@@ -30,29 +30,29 @@ const PLANT_PRESETS = {
   cactus: {
     label: '🌵 Cactus',
     tempLabel: 'Cálida (15°C – 30°C)',
-    temp:   [15, 30],
-    aire:   [10, 30],
+    temp: [15, 30],
+    aire: [10, 30],
     tierra: [5, 15]
   },
   ruda_templada: {
     label: '🌿 Ruda',
     tempLabel: 'Templada (10°C – 25°C)',
-    temp:   [10, 25],
-    aire:   [30, 50],
+    temp: [10, 25],
+    aire: [30, 50],
     tierra: [20, 40]
   },
   Filodendro: {
     label: '🌿 Filodendro',
     tempLabel: 'Cálida (18°C – 25°C)',
-    temp:   [18, 25],
-    aire:   [30, 50],
+    temp: [18, 25],
+    aire: [30, 50],
     tierra: [50, 80]
   },
   custom: {
     label: '⚙️ Personalizado',
     tempLabel: 'Personalizado',
-    temp:   [null, null],
-    aire:   [null, null],
+    temp: [null, null],
+    aire: [null, null],
     tierra: [null, null]
   }
 };
@@ -73,7 +73,7 @@ function loadPlantProfile() {
 }
 
 function savePlantProfile(profile) {
-  try { localStorage.setItem(PLANT_PROFILES_STORAGE_KEY, JSON.stringify(profile)); } catch (_) {}
+  try { localStorage.setItem(PLANT_PROFILES_STORAGE_KEY, JSON.stringify(profile)); } catch (_) { }
 }
 
 // Devuelve los rangos activos (preset o personalizado)
@@ -81,8 +81,8 @@ function getActiveThresholds() {
   const profile = loadPlantProfile();
   if (profile.preset === 'custom') {
     return {
-      temp:   profile.custom.temp   || [null, null],
-      aire:   profile.custom.aire   || [null, null],
+      temp: profile.custom.temp || [null, null],
+      aire: profile.custom.aire || [null, null],
       tierra: profile.custom.tierra || [null, null]
     };
   }
@@ -93,8 +93,8 @@ function getActiveThresholds() {
 // ── PLANT PROFILE UI ────────────────────────────────────────────────────────
 
 function setupPlantProfileUI() {
-  const presetSel  = document.getElementById('plant-preset');
-  const nameInput  = document.getElementById('plant-name');
+  const presetSel = document.getElementById('plant-preset');
+  const nameInput = document.getElementById('plant-name');
   const customWrap = document.getElementById('plant-custom-fields');
   if (!presetSel) return;
 
@@ -124,10 +124,10 @@ function setupPlantProfileUI() {
   }
 
   function fillCustomInputs(custom) {
-    setVal('plant-custom-temp-min',   custom.temp?.[0]);
-    setVal('plant-custom-temp-max',   custom.temp?.[1]);
-    setVal('plant-custom-aire-min',   custom.aire?.[0]);
-    setVal('plant-custom-aire-max',   custom.aire?.[1]);
+    setVal('plant-custom-temp-min', custom.temp?.[0]);
+    setVal('plant-custom-temp-max', custom.temp?.[1]);
+    setVal('plant-custom-aire-min', custom.aire?.[0]);
+    setVal('plant-custom-aire-max', custom.aire?.[1]);
     setVal('plant-custom-tierra-min', custom.tierra?.[0]);
     setVal('plant-custom-tierra-max', custom.tierra?.[1]);
   }
@@ -157,7 +157,7 @@ function populatePlantInfoBox(presetKey) {
 function savePlantProfileFromUI() {
   const presetSel = document.getElementById('plant-preset');
   const nameInput = document.getElementById('plant-name');
-  const statusEl  = document.getElementById('cfg-plant-status');
+  const statusEl = document.getElementById('cfg-plant-status');
   if (!presetSel) return;
 
   const preset = presetSel.value;
@@ -165,8 +165,8 @@ function savePlantProfileFromUI() {
     preset,
     plantName: nameInput ? nameInput.value.trim() : '',
     custom: {
-      temp:   [getNum('plant-custom-temp-min'),   getNum('plant-custom-temp-max')],
-      aire:   [getNum('plant-custom-aire-min'),   getNum('plant-custom-aire-max')],
+      temp: [getNum('plant-custom-temp-min'), getNum('plant-custom-temp-max')],
+      aire: [getNum('plant-custom-aire-min'), getNum('plant-custom-aire-max')],
       tierra: [getNum('plant-custom-tierra-min'), getNum('plant-custom-tierra-max')]
     }
   };
@@ -223,24 +223,36 @@ function buildAlertMessages(current) {
 
   // Temperatura
   const tempState = evaluateRange(current.temperatura, thresholds.temp);
-  if (tempState === 'low')  alerts.push({ level: 'warn', icon: '🥶', key: 'temp_low',  text: `Temperatura muy baja (${current.temperatura}°C). Rango ideal: ${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C.`,
-    notifyTitle: '🥶 Temperatura muy baja', notifyBody: `${current.temperatura}°C — por debajo del rango ideal (${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C).` });
-  if (tempState === 'high') alerts.push({ level: 'warn', icon: '🥵', key: 'temp_high', text: `Temperatura muy alta (${current.temperatura}°C). Rango ideal: ${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C.`,
-    notifyTitle: '🥵 Temperatura muy alta', notifyBody: `${current.temperatura}°C — por encima del rango ideal (${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C).` });
+  if (tempState === 'low') alerts.push({
+    level: 'warn', icon: '🥶', key: 'temp_low', text: `Temperatura muy baja (${current.temperatura}°C). Rango ideal: ${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C.`,
+    notifyTitle: '🥶 Temperatura muy baja', notifyBody: `${current.temperatura}°C — por debajo del rango ideal (${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C).`
+  });
+  if (tempState === 'high') alerts.push({
+    level: 'warn', icon: '🥵', key: 'temp_high', text: `Temperatura muy alta (${current.temperatura}°C). Rango ideal: ${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C.`,
+    notifyTitle: '🥵 Temperatura muy alta', notifyBody: `${current.temperatura}°C — por encima del rango ideal (${thresholds.temp[0]}°C – ${thresholds.temp[1]}°C).`
+  });
 
   // Humedad aire
   const aireState = evaluateRange(current.humedad_aire, thresholds.aire);
-  if (aireState === 'low')  alerts.push({ level: 'warn', icon: '🍂', key: 'aire_low',  text: `Humedad ambiental muy baja (${current.humedad_aire}%). Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%. Riesgo de puntas quemadas y plagas (ácaros).`,
-    notifyTitle: '🍂 Humedad ambiental baja', notifyBody: `${current.humedad_aire}% — riesgo de puntas quemadas y plagas. Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%.` });
-  if (aireState === 'high') alerts.push({ level: 'warn', icon: '💧', key: 'aire_high', text: `Humedad ambiental muy alta (${current.humedad_aire}%). Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%. Riesgo de hongos foliares.`,
-    notifyTitle: '💧 Humedad ambiental alta', notifyBody: `${current.humedad_aire}% — riesgo de hongos foliares. Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%.` });
+  if (aireState === 'low') alerts.push({
+    level: 'warn', icon: '🍂', key: 'aire_low', text: `Humedad ambiental muy baja (${current.humedad_aire}%). Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%. Riesgo de puntas quemadas y plagas (ácaros).`,
+    notifyTitle: '🍂 Humedad ambiental baja', notifyBody: `${current.humedad_aire}% — riesgo de puntas quemadas y plagas. Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%.`
+  });
+  if (aireState === 'high') alerts.push({
+    level: 'warn', icon: '💧', key: 'aire_high', text: `Humedad ambiental muy alta (${current.humedad_aire}%). Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%. Riesgo de hongos foliares.`,
+    notifyTitle: '💧 Humedad ambiental alta', notifyBody: `${current.humedad_aire}% — riesgo de hongos foliares. Rango ideal: ${thresholds.aire[0]}% – ${thresholds.aire[1]}%.`
+  });
 
   // Humedad tierra
   const tierraState = evaluateRange(current.humedad_tierra, thresholds.tierra);
-  if (tierraState === 'low')  alerts.push({ level: 'critical', icon: '🚱', key: 'tierra_low',  text: `Humedad de sustrato muy baja (${current.humedad_tierra}%). Rango ideal: ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%. ¡Riega la planta!`,
-    notifyTitle: '🚱 ¡Tu planta necesita agua!', notifyBody: `Humedad de sustrato: ${current.humedad_tierra}% (rango ideal ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%). Riega tu planta pronto.`, requireInteraction: true });
-  if (tierraState === 'high') alerts.push({ level: 'critical', icon: '🌊', key: 'tierra_high', text: `Humedad de sustrato muy alta (${current.humedad_tierra}%). Rango ideal: ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%. Riesgo de pudrición radicular. No riegues.`,
-    notifyTitle: '🌊 Exceso de agua en el sustrato', notifyBody: `Humedad de sustrato: ${current.humedad_tierra}% (rango ideal ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%). No riegues: riesgo de pudrición radicular.`, requireInteraction: true });
+  if (tierraState === 'low') alerts.push({
+    level: 'critical', icon: '🚱', key: 'tierra_low', text: `Humedad de sustrato muy baja (${current.humedad_tierra}%). Rango ideal: ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%. ¡Riega la planta!`,
+    notifyTitle: '🚱 ¡Tu planta necesita agua!', notifyBody: `Humedad de sustrato: ${current.humedad_tierra}% (rango ideal ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%). Riega tu planta pronto.`, requireInteraction: true
+  });
+  if (tierraState === 'high') alerts.push({
+    level: 'critical', icon: '🌊', key: 'tierra_high', text: `Humedad de sustrato muy alta (${current.humedad_tierra}%). Rango ideal: ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%. Riesgo de pudrición radicular. No riegues.`,
+    notifyTitle: '🌊 Exceso de agua en el sustrato', notifyBody: `Humedad de sustrato: ${current.humedad_tierra}% (rango ideal ${thresholds.tierra[0]}% – ${thresholds.tierra[1]}%). No riegues: riesgo de pudrición radicular.`, requireInteraction: true
+  });
 
   return alerts;
 }
@@ -276,7 +288,7 @@ function loadAlertState() {
 }
 
 function saveAlertState(state) {
-  try { localStorage.setItem(ALERT_STATE_KEY, JSON.stringify(state)); } catch (_) {}
+  try { localStorage.setItem(ALERT_STATE_KEY, JSON.stringify(state)); } catch (_) { }
 }
 
 // Notifica solo las alertas que acaban de activarse (no estaban activas antes)
@@ -307,10 +319,10 @@ function sendAppNotification(title, body, tag, requireInteraction = false) {
           payload: { title, body, tag, requireInteraction }
         });
       }).catch(() => {
-        try { new Notification(title, { body, tag }); } catch (_) {}
+        try { new Notification(title, { body, tag }); } catch (_) { }
       });
     } else {
-      try { new Notification(title, { body, tag }); } catch (_) {}
+      try { new Notification(title, { body, tag }); } catch (_) { }
     }
   };
 
@@ -339,8 +351,8 @@ function getLatestReadingValues() {
   if (!trendHistory.timestamps.length) return null;
   const i = trendHistory.timestamps.length - 1;
   return {
-    temperatura:    trendHistory.temperatura[i],
-    humedad_aire:   trendHistory.humedad_aire[i],
+    temperatura: trendHistory.temperatura[i],
+    humedad_aire: trendHistory.humedad_aire[i],
     humedad_tierra: trendHistory.humedad_tierra[i]
   };
 }
@@ -369,7 +381,7 @@ function normalizeVariableName(variable) {
   if (/temp(eratura)?(\b|$)|°c|celsius|temperature|temp\b/.test(name)) return 'temperatura';
 
   const tierraPatterns = /humedad.*(tierra|suelo|sustrato)|(?:tierra|suelo|sustrato).*(humedad)|(^|[_\s-])(tierra|suelo|sustrato)([_\s-]|$)|soil.*(moisture|humidity)|(?:moisture|humidity).*(soil|ground)/;
-  const airePatterns   = /humedad.*(aire|ambient|ambiente)|(?:aire|ambient|ambiente).*(humedad)|air.*humidity|humidity.*air/;
+  const airePatterns = /humedad.*(aire|ambient|ambiente)|(?:aire|ambient|ambiente).*(humedad)|air.*humidity|humidity.*air/;
 
   if (tierraPatterns.test(name) && !/tierra[_\s-]*bruta|bruta|bruto|raw/.test(name)) return 'humedad_tierra';
   if (airePatterns.test(name)) return 'humedad_aire';
@@ -385,16 +397,16 @@ function normalizeVariableName(variable) {
 // Asigna clase CSS a la reading-card según el tipo de variable
 function variableCardClass(variable) {
   const key = normalizeVariableName(variable) || '';
-  if (key === 'temperatura')   return 'temp';
-  if (key === 'humedad_aire')  return 'aire';
+  if (key === 'temperatura') return 'temp';
+  if (key === 'humedad_aire') return 'aire';
   if (key === 'humedad_tierra') return 'tierra';
   return 'other';
 }
 
 function variableEmoji(variable) {
   const key = normalizeVariableName(variable) || String(variable || '').toLowerCase();
-  if (/temp|temperatura|°c|celsius/.test(key))           return '☀️';
-  if (/humedad_aire|aire|ambiente|ambient/.test(key))     return '☁️';
+  if (/temp|temperatura|°c|celsius/.test(key)) return '☀️';
+  if (/humedad_aire|aire|ambiente|ambient/.test(key)) return '☁️';
   if (/humedad_tierra|tierra|suelo|sustrato|soil/.test(key)) return '🌱';
   return '';
 }
@@ -469,11 +481,11 @@ function loadChartHistory() {
     if (!stored) return { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
     const parsed = JSON.parse(stored);
     return {
-      timestamps:    Array.isArray(parsed.timestamps)    ? parsed.timestamps    : [],
-      temperatura:   Array.isArray(parsed.temperatura)   ? parsed.temperatura   : [],
-      humedad_aire:  Array.isArray(parsed.humedad_aire)  ? parsed.humedad_aire  : [],
+      timestamps: Array.isArray(parsed.timestamps) ? parsed.timestamps : [],
+      temperatura: Array.isArray(parsed.temperatura) ? parsed.temperatura : [],
+      humedad_aire: Array.isArray(parsed.humedad_aire) ? parsed.humedad_aire : [],
       humedad_tierra: Array.isArray(parsed.humedad_tierra) ? parsed.humedad_tierra : [],
-      rawLecturas:   Array.isArray(parsed.rawLecturas)   ? parsed.rawLecturas   : []
+      rawLecturas: Array.isArray(parsed.rawLecturas) ? parsed.rawLecturas : []
     };
   } catch {
     return { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
@@ -490,7 +502,7 @@ function saveChartHistory() {
 // ── TELEMETRY PARSING ─────────────────────────────────────────────────────────
 
 function parseTelemetryHistory(payload) {
-  let items  = [];
+  let items = [];
   const points = {};
 
   if (Array.isArray(payload)) {
@@ -508,23 +520,23 @@ function parseTelemetryHistory(payload) {
       const nested = Object.values(payload).find(v => Array.isArray(v));
       if (Array.isArray(nested)) items = nested;
 
-      const ts    = payload.timestamps || payload.fechas || payload.dates;
+      const ts = payload.timestamps || payload.fechas || payload.dates;
       const sTemp = payload.temperatura || payload.temp || payload.temperature;
       const sAire = payload.humedad_aire || payload.humedad_ambiente || payload.humidity_air || payload.humidity;
       const sTierra = payload.humedad_tierra || payload.humedad_suelo || payload.soil_humidity || payload.soil_moisture;
 
       if (Array.isArray(ts) && (Array.isArray(sTemp) || Array.isArray(sAire) || Array.isArray(sTierra))) {
         const maxLen = Math.max(ts.length,
-          Array.isArray(sTemp)   ? sTemp.length   : 0,
-          Array.isArray(sAire)   ? sAire.length   : 0,
+          Array.isArray(sTemp) ? sTemp.length : 0,
+          Array.isArray(sAire) ? sAire.length : 0,
           Array.isArray(sTierra) ? sTierra.length : 0);
         for (let i = 0; i < maxLen; i++) {
           const t = new Date(ts[i]);
           if (Number.isNaN(t.getTime())) continue;
           const timestamp = t.toISOString();
           points[timestamp] = {
-            temperatura:    Array.isArray(sTemp)   ? normalizeValue(sTemp[i])   : null,
-            humedad_aire:   Array.isArray(sAire)   ? normalizeValue(sAire[i])   : null,
+            temperatura: Array.isArray(sTemp) ? normalizeValue(sTemp[i]) : null,
+            humedad_aire: Array.isArray(sAire) ? normalizeValue(sAire[i]) : null,
             humedad_tierra: Array.isArray(sTierra) ? normalizeValue(sTierra[i]) : null
           };
         }
@@ -568,10 +580,10 @@ function formatTimestamp(timestamp) {
 
 function updateTrendChartData() {
   if (!trendChart) return;
-  trendChart.data.labels                   = trendHistory.timestamps.map(formatTimestamp);
-  trendChart.data.datasets[0].data         = trendHistory.temperatura;
-  trendChart.data.datasets[1].data         = trendHistory.humedad_aire;
-  trendChart.data.datasets[2].data         = trendHistory.humedad_tierra;
+  trendChart.data.labels = trendHistory.timestamps.map(formatTimestamp);
+  trendChart.data.datasets[0].data = trendHistory.temperatura;
+  trendChart.data.datasets[1].data = trendHistory.humedad_aire;
+  trendChart.data.datasets[2].data = trendHistory.humedad_tierra;
   trendChart.update();
 }
 
@@ -669,11 +681,11 @@ function createTrendChart() {
       scales: {
         x: {
           ticks: { color: '#8a7e72', font: { size: 11 }, maxTicksLimit: 10 },
-          grid:  { color: 'rgba(221,213,200,0.5)' }
+          grid: { color: 'rgba(221,213,200,0.5)' }
         },
         y: {
           ticks: { color: '#8a7e72', font: { size: 11 } },
-          grid:  { color: 'rgba(221,213,200,0.5)' }
+          grid: { color: 'rgba(221,213,200,0.5)' }
         }
       }
     }
@@ -722,8 +734,8 @@ function renderHistoryTable(filter = { type: 'all' }) {
       rows.push({
         timestamp: ts, date: formatDateCL(ts), time: formatTimeCL(ts),
         humedad_tierra: trendHistory.humedad_tierra[i],
-        temperatura:    trendHistory.temperatura[i],
-        humedad_aire:   trendHistory.humedad_aire[i]
+        temperatura: trendHistory.temperatura[i],
+        humedad_aire: trendHistory.humedad_aire[i]
       });
     }
   }
@@ -741,7 +753,7 @@ function renderHistoryTable(filter = { type: 'all' }) {
     const targetStr = new Date(filter.date + 'T00:00:00').toLocaleDateString('es-CL', { timeZone: 'America/Santiago' });
     if (filter.from && filter.to) {
       const fromTs = new Date(filter.date + 'T' + filter.from + ':00');
-      const toTs   = new Date(filter.date + 'T' + filter.to   + ':00');
+      const toTs = new Date(filter.date + 'T' + filter.to + ':00');
       filtered = rows.filter(r => { const t = new Date(r.timestamp); return t >= fromTs && t <= toTs; });
     } else {
       filtered = rows.filter(r => r.date === targetStr);
@@ -769,23 +781,23 @@ function renderHistoryTable(filter = { type: 'all' }) {
 }
 
 function applyHistoryFilterFromUI() {
-  const sel  = document.getElementById('history-filter');
+  const sel = document.getElementById('history-filter');
   const type = sel ? sel.value : 'all';
   const date = document.getElementById('filter-date')?.value;
   const from = document.getElementById('filter-from')?.value;
-  const to   = document.getElementById('filter-to')?.value;
+  const to = document.getElementById('filter-to')?.value;
   const filter = { type };
   if (date) filter.date = date;
   if (from) filter.from = from;
-  if (to)   filter.to   = to;
+  if (to) filter.to = to;
   renderHistoryTable(filter);
 }
 
 function setupHistoryFilterUI() {
-  const sel    = document.getElementById('history-filter');
+  const sel = document.getElementById('history-filter');
   const dateEl = document.getElementById('filter-date');
   const fromEl = document.getElementById('filter-from');
-  const toEl   = document.getElementById('filter-to');
+  const toEl = document.getElementById('filter-to');
   const applyBtn = document.getElementById('filter-apply');
   const resetBtn = document.getElementById('filter-reset');
   if (!sel) return;
@@ -794,16 +806,16 @@ function setupHistoryFilterUI() {
     const show = v === 'custom';
     dateEl.style.display = show ? 'inline-block' : 'none';
     fromEl.style.display = show ? 'inline-block' : 'none';
-    toEl.style.display   = show ? 'inline-block' : 'none';
+    toEl.style.display = show ? 'inline-block' : 'none';
   };
 
   sel.addEventListener('change', () => toggleCustom(sel.value));
   applyBtn?.addEventListener('click', applyHistoryFilterFromUI);
   resetBtn?.addEventListener('click', () => {
-    sel.value    = 'all';
+    sel.value = 'all';
     dateEl.value = '';
     fromEl.value = '';
-    toEl.value   = '';
+    toEl.value = '';
     toggleCustom('all');
     renderHistoryTable({ type: 'all' });
   });
@@ -901,7 +913,7 @@ function saveMeasurementInterval() {
   if (token && device) {
     fetch(`${API_URL}/api/dispositivo/${device}/config`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + token
       },
@@ -915,12 +927,12 @@ function saveMeasurementInterval() {
         statusEl.textContent = '✅ Frecuencia de medición actualizada correctamente.';
         statusEl.style.color = 'var(--success)';
         statusEl.style.display = 'block';
-        
+
         // Guardar en localStorage como respaldo
         try {
           localStorage.setItem('cfg-interval', JSON.stringify({ value, unit, seconds: intervalSeconds }));
-        } catch (_) {}
-        
+        } catch (_) { }
+
         setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
       })
       .catch(err => {
@@ -928,11 +940,11 @@ function saveMeasurementInterval() {
         statusEl.textContent = '❌ No se pudo actualizar. Se guardó localmente.';
         statusEl.style.color = 'var(--error)';
         statusEl.style.display = 'block';
-        
+
         // Guardar en localStorage como respaldo
         try {
           localStorage.setItem('cfg-interval', JSON.stringify({ value, unit, seconds: intervalSeconds }));
-        } catch (_) {}
+        } catch (_) { }
       });
   } else {
     // Si no hay sesión, solo guardar en localStorage
@@ -980,7 +992,7 @@ function loadDeviceLogs() {
     })
     .then(data => {
       let lines = [];
-      
+
       if (Array.isArray(data)) {
         lines = data.map(item => {
           if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') return String(item);
@@ -996,7 +1008,7 @@ function loadDeviceLogs() {
       } else if (data && typeof data === 'object') {
         lines = [JSON.stringify(data, null, 2)];
       }
-      
+
       if (!lines.length) lines = ['No hay logs disponibles.'];
       consoleEl.innerHTML = lines.map(line => `<div class="log-line">${line}</div>`).join('');
       statusEl.textContent = 'Logs actualizados';
@@ -1057,10 +1069,10 @@ async function doLogin(event) {
     });
     const data = await response.json();
     if (!response.ok) { showError('login-user', data.message || data.error || `Error ${response.status}`); setButtonLoading('login-btn', false); return; }
-    if (!data.token)  { showError('login-user', 'Usuario o contraseña incorrectos'); setButtonLoading('login-btn', false); return; }
-    token  = data.token;
+    if (!data.token) { showError('login-user', 'Usuario o contraseña incorrectos'); setButtonLoading('login-btn', false); return; }
+    token = data.token;
     device = data.dispositivo_id;
-    try { localStorage.setItem('token', token); localStorage.setItem('device', device); } catch (_) {}
+    try { localStorage.setItem('token', token); localStorage.setItem('device', device); } catch (_) { }
     showDashboard();
     startAutoRefresh();
   } catch (e) {
@@ -1073,14 +1085,14 @@ async function doLogin(event) {
 async function doRegister(event) {
   event.preventDefault();
   clearErrors();
-  const user      = document.getElementById('reg-user').value.trim();
-  const pass      = document.getElementById('reg-pass').value.trim();
-  const deviceId  = document.getElementById('reg-device').value.trim();
+  const user = document.getElementById('reg-user').value.trim();
+  const pass = document.getElementById('reg-pass').value.trim();
+  const deviceId = document.getElementById('reg-device').value.trim();
   const tokenAuth = document.getElementById('reg-token').value.trim();
-  if (!user)                               { showError('reg-user',   'El usuario es requerido'); return; }
-  if (!validateInput(pass, 'password'))    { showError('reg-pass',   'La contraseña debe tener al menos 6 caracteres'); return; }
-  if (!deviceId)                           { showError('reg-device', 'El ID del dispositivo es requerido'); return; }
-  if (!tokenAuth)                          { showError('reg-token',  'El token es requerido'); return; }
+  if (!user) { showError('reg-user', 'El usuario es requerido'); return; }
+  if (!validateInput(pass, 'password')) { showError('reg-pass', 'La contraseña debe tener al menos 6 caracteres'); return; }
+  if (!deviceId) { showError('reg-device', 'El ID del dispositivo es requerido'); return; }
+  if (!tokenAuth) { showError('reg-token', 'El token es requerido'); return; }
   setButtonLoading('reg-btn', true);
   try {
     const response = await fetch(API_URL + '/api/auth/register', {
@@ -1090,9 +1102,9 @@ async function doRegister(event) {
     });
     const data = await response.json();
     if (!response.ok) { showError('reg-user', data.message || data.error || `Error ${response.status}`); setButtonLoading('reg-btn', false); return; }
-    token  = data.token;
+    token = data.token;
     device = data.dispositivo_id;
-    try { localStorage.setItem('token', token); localStorage.setItem('device', device); } catch (_) {}
+    try { localStorage.setItem('token', token); localStorage.setItem('device', device); } catch (_) { }
     showDashboard();
     startAutoRefresh();
   } catch (e) {
@@ -1105,14 +1117,14 @@ async function doRegister(event) {
 async function doAdminRegisterDevice(event) {
   event.preventDefault();
   clearErrors();
-  const adminKey  = document.getElementById('admin-master-key').value.trim();
+  const adminKey = document.getElementById('admin-master-key').value.trim();
   const newDevice = document.getElementById('admin-device-id').value.trim();
-  const newToken  = document.getElementById('admin-device-token').value.trim();
+  const newToken = document.getElementById('admin-device-token').value.trim();
   const successBox = document.getElementById('admin-success');
   successBox.classList.remove('show');
-  if (!adminKey)  { showError('admin-master-key',  'La clave de administrador es obligatoria'); return; }
-  if (!newDevice) { showError('admin-device-id',   'Ingresa el ID del dispositivo'); return; }
-  if (!newToken)  { showError('admin-device-token', 'Asigna un token al dispositivo'); return; }
+  if (!adminKey) { showError('admin-master-key', 'La clave de administrador es obligatoria'); return; }
+  if (!newDevice) { showError('admin-device-id', 'Ingresa el ID del dispositivo'); return; }
+  if (!newToken) { showError('admin-device-token', 'Asigna un token al dispositivo'); return; }
   setButtonLoading('admin-btn', true);
   try {
     const response = await fetch(API_URL + '/api/admin/dispositivos', {
@@ -1124,7 +1136,7 @@ async function doAdminRegisterDevice(event) {
     if (!response.ok) { showError('admin-master-key', data.message || data.error || 'Clave inválida o error en servidor'); setButtonLoading('admin-btn', false); return; }
     successBox.innerHTML = `<strong>¡Equipo registrado!</strong><br>ID: ${newDevice}<br>Token: ${newToken}`;
     successBox.classList.add('show');
-    document.getElementById('admin-device-id').value    = '';
+    document.getElementById('admin-device-id').value = '';
     document.getElementById('admin-device-token').value = '';
     setButtonLoading('admin-btn', false);
   } catch (e) {
@@ -1164,8 +1176,8 @@ async function load() {
 
     // Device name
     const deviceName = data.dispositivo_id || device || 'Dispositivo';
-    document.getElementById('device').innerText       = deviceName;
-    document.getElementById('main-title').innerText   = deviceName;
+    document.getElementById('device').innerText = deviceName;
+    document.getElementById('main-title').innerText = deviceName;
 
     // Sidebar & status badge
     const isOnline = !!data.online;
@@ -1173,16 +1185,16 @@ async function load() {
     const statusBadge = document.getElementById('status');
 
     if (isOnline) {
-      statusBadge.textContent    = 'ONLINE';
-      statusBadge.className      = 'status-badge status-online';
-      document.getElementById('status-meta').innerText   = 'Sensor activo — recolectando datos';
+      statusBadge.textContent = 'ONLINE';
+      statusBadge.className = 'status-badge status-online';
+      document.getElementById('status-meta').innerText = 'Sensor activo — recolectando datos';
       document.getElementById('sensor-status').innerText = 'Activo';
       document.getElementById('sidebar-status-text').innerText = 'Online';
       if (dot) { dot.className = 'status-dot online'; }
     } else {
-      statusBadge.textContent    = 'OFFLINE';
-      statusBadge.className      = 'status-badge status-offline';
-      document.getElementById('status-meta').innerText   = 'Sin conexión — esperando actualización';
+      statusBadge.textContent = 'OFFLINE';
+      statusBadge.className = 'status-badge status-offline';
+      document.getElementById('status-meta').innerText = 'Sin conexión — esperando actualización';
       document.getElementById('sensor-status').innerText = 'Offline';
       document.getElementById('sidebar-status-text').innerText = 'Offline';
       if (dot) { dot.className = 'status-dot offline'; }
@@ -1250,13 +1262,13 @@ async function load() {
     const lastTs = trendHistory.timestamps[trendHistory.timestamps.length - 1];
     if (!lastTs || lastTs !== timestamp) {
       trendHistory.timestamps.push(timestamp);
-      trendHistory.temperatura.push(   Number.isNaN(current.temperatura)    ? null : current.temperatura);
-      trendHistory.humedad_aire.push(  Number.isNaN(current.humedad_aire)   ? null : current.humedad_aire);
+      trendHistory.temperatura.push(Number.isNaN(current.temperatura) ? null : current.temperatura);
+      trendHistory.humedad_aire.push(Number.isNaN(current.humedad_aire) ? null : current.humedad_aire);
       trendHistory.humedad_tierra.push(Number.isNaN(current.humedad_tierra) ? null : current.humedad_tierra);
     } else {
       const i = trendHistory.timestamps.length - 1;
-      if (!Number.isNaN(current.temperatura))    trendHistory.temperatura[i]    = current.temperatura;
-      if (!Number.isNaN(current.humedad_aire))   trendHistory.humedad_aire[i]   = current.humedad_aire;
+      if (!Number.isNaN(current.temperatura)) trendHistory.temperatura[i] = current.temperatura;
+      if (!Number.isNaN(current.humedad_aire)) trendHistory.humedad_aire[i] = current.humedad_aire;
       if (!Number.isNaN(current.humedad_tierra)) trendHistory.humedad_tierra[i] = current.humedad_tierra;
     }
 
@@ -1269,7 +1281,7 @@ async function load() {
 
     saveChartHistory();
     if (!trendChart) createTrendChart();
-    
+
     // Guardar datos completos para filtros de rango
     trendHistoryFullRange = JSON.parse(JSON.stringify(trendHistory));
     updateTrendChartData();
@@ -1279,7 +1291,7 @@ async function load() {
 
   } catch (error) {
     console.error('Error al cargar datos:', error);
-    
+
     // Fallback: intentar cargar datos cacheados
     const cachedHistory = loadChartHistory();
     if (cachedHistory && cachedHistory.timestamps && cachedHistory.timestamps.length > 0) {
@@ -1288,20 +1300,20 @@ async function load() {
       if (!trendChart) createTrendChart();
       updateTrendChartData();
       updateAlerts();
-      
+
       document.getElementById('status').textContent = 'OFFLINE (CACHÉ)';
-      document.getElementById('status').className   = 'status-badge status-offline';
-      document.getElementById('status-meta').innerText   = 'Usando datos cacheados — sin conexión con servidor';
+      document.getElementById('status').className = 'status-badge status-offline';
+      document.getElementById('status-meta').innerText = 'Usando datos cacheados — sin conexión con servidor';
       document.getElementById('sensor-status').innerText = 'Offline';
       const dot = document.getElementById('sidebar-dot');
       if (dot) dot.className = 'status-dot offline';
       return;
     }
-    
+
     // Si no hay caché, mostrar error
     document.getElementById('status').textContent = 'ERROR';
-    document.getElementById('status').className   = 'status-badge status-offline';
-    document.getElementById('status-meta').innerText   = 'No se pudieron obtener datos del servidor';
+    document.getElementById('status').className = 'status-badge status-offline';
+    document.getElementById('status-meta').innerText = 'No se pudieron obtener datos del servidor';
     document.getElementById('sensor-status').innerText = 'Error';
     const dot = document.getElementById('sidebar-dot');
     if (dot) dot.className = 'status-dot offline';
@@ -1331,7 +1343,7 @@ async function loadHistoricalData() {
         let pageRows = [];
         if (Array.isArray(body)) pageRows = body;
         else if (Array.isArray(body.lecturas)) pageRows = body.lecturas;
-        else if (Array.isArray(body.rows))     pageRows = body.rows;
+        else if (Array.isArray(body.rows)) pageRows = body.rows;
         else break;
         if (!pageRows.length) break;
         all.push(...pageRows.filter(r => !r.dispositivo_id || r.dispositivo_id === device));
@@ -1350,7 +1362,7 @@ async function loadHistoricalData() {
   try {
     const lecturasAll = await fetchAllLecturas();
     if (Array.isArray(lecturasAll) && lecturasAll.length) {
-      payload   = { lecturas: lecturasAll };
+      payload = { lecturas: lecturasAll };
       foundPath = '/api/lecturas';
     }
   } catch (e) { console.warn('Error intentando /api/lecturas:', e); }
@@ -1413,7 +1425,7 @@ async function loadHistoricalData() {
       normalized.lecturas = payload;
     }
   } else if (payload && typeof payload === 'object') {
-    if (Array.isArray(payload.lecturas))  normalized.lecturas = payload.lecturas.filter(i => !i.dispositivo_id || i.dispositivo_id === device);
+    if (Array.isArray(payload.lecturas)) normalized.lecturas = payload.lecturas.filter(i => !i.dispositivo_id || i.dispositivo_id === device);
     else if (Array.isArray(payload.data)) normalized.lecturas = payload.data.filter(i => !i.dispositivo_id || i.dispositivo_id === device);
     else if (Array.isArray(payload.items)) normalized.lecturas = payload.items.filter(i => !i.dispositivo_id || i.dispositivo_id === device);
     else {
@@ -1429,7 +1441,7 @@ async function loadHistoricalData() {
   const parsedHistory = parseTelemetryHistory(normalized);
   if (!parsedHistory.timestamps.length) return false;
 
-  trendHistory    = parsedHistory;
+  trendHistory = parsedHistory;
   trendHistoryRaw = Array.isArray(normalized.lecturas) && normalized.lecturas.length
     ? normalized.lecturas.map(l => ({ ...l }))
     : [];
@@ -1444,7 +1456,7 @@ async function loadHistoricalData() {
 
 function initializeChartFromStorage() {
   const stored = loadChartHistory();
-  trendHistory    = stored;
+  trendHistory = stored;
   trendHistoryRaw = Array.isArray(stored.rawLecturas) ? stored.rawLecturas : [];
   if (!trendHistory.timestamps.length && !trendHistoryRaw.length) return false;
   renderHistoryTable();
@@ -1475,7 +1487,7 @@ function stopAutoRefresh() {
 
 function logout() {
   stopAutoRefresh();
-  try { localStorage.removeItem('token'); localStorage.removeItem('device'); } catch (_) {}
+  try { localStorage.removeItem('token'); localStorage.removeItem('device'); } catch (_) { }
   hideDashboard();
   clearErrors();
 
@@ -1490,10 +1502,10 @@ function logout() {
 
   // Destruir gráfico
   if (trendChart) { trendChart.destroy(); trendChart = null; }
-  trendHistory    = { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
+  trendHistory = { timestamps: [], temperatura: [], humedad_aire: [], humedad_tierra: [] };
   trendHistoryRaw = [];
 
-  token  = null;
+  token = null;
   device = null;
 }
 
@@ -1529,7 +1541,7 @@ function registerServiceWorker() {
 
 function updateNotificationStatusUI() {
   const statusEl = document.getElementById('notif-status');
-  const btn      = document.getElementById('notif-enable-btn');
+  const btn = document.getElementById('notif-enable-btn');
   if (!statusEl || !btn) return;
 
   if (!('Notification' in window)) {
@@ -1594,23 +1606,23 @@ function showInstallPrompt() {
 
   try {
     if (localStorage.getItem(PWA_PROMPT_DISMISSED_KEY) === 'true') return;
-  } catch (_) {}
+  } catch (_) { }
 
   const modal = document.getElementById('pwa-install-modal');
   if (!modal) return;
 
-  const iosInstructions     = document.getElementById('pwa-ios-instructions');
+  const iosInstructions = document.getElementById('pwa-ios-instructions');
   const androidInstructions = document.getElementById('pwa-android-instructions');
-  const installBtn          = document.getElementById('pwa-install-btn');
+  const installBtn = document.getElementById('pwa-install-btn');
 
   if (isIOS()) {
-    if (iosInstructions)     iosInstructions.style.display = 'block';
+    if (iosInstructions) iosInstructions.style.display = 'block';
     if (androidInstructions) androidInstructions.style.display = 'none';
-    if (installBtn)          installBtn.style.display = 'none';
+    if (installBtn) installBtn.style.display = 'none';
   } else {
-    if (iosInstructions)     iosInstructions.style.display = 'none';
+    if (iosInstructions) iosInstructions.style.display = 'none';
     if (androidInstructions) androidInstructions.style.display = 'block';
-    if (installBtn)          installBtn.style.display = deferredInstallPrompt ? 'inline-flex' : 'none';
+    if (installBtn) installBtn.style.display = deferredInstallPrompt ? 'inline-flex' : 'none';
   }
 
   modal.classList.add('show');
@@ -1620,7 +1632,7 @@ function hidePwaModal(remember) {
   const modal = document.getElementById('pwa-install-modal');
   if (modal) modal.classList.remove('show');
   if (remember) {
-    try { localStorage.setItem(PWA_PROMPT_DISMISSED_KEY, 'true'); } catch (_) {}
+    try { localStorage.setItem(PWA_PROMPT_DISMISSED_KEY, 'true'); } catch (_) { }
   }
 }
 
@@ -1664,17 +1676,17 @@ function setupPwaInstallPrompt() {
 //  NO soportado en iOS Safari — limitación del navegador, no del firmware.
 // ════════════════════════════════════════════════════════════════════════════
 
-const BLE_SERVICE_UUID         = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-const BLE_CHAR_TELEMETRY_UUID  = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // READ + NOTIFY
-const BLE_CHAR_STATUS_UUID     = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // READ
-const BLE_CHAR_CONFIG_UUID     = '6e400004-b5a3-f393-e0a9-e50e24dcca9e'; // WRITE
-const BLE_CHAR_WIFILOG_UUID    = '6e400005-b5a3-f393-e0a9-e50e24dcca9e'; // READ + NOTIFY
-const BLE_CHAR_HEARTBEAT_UUID  = '6e400006-b5a3-f393-e0a9-e50e24dcca9e'; // v2.3 READ + NOTIFY (opcional)
+const BLE_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const BLE_CHAR_TELEMETRY_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // READ + NOTIFY
+const BLE_CHAR_STATUS_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // READ
+const BLE_CHAR_CONFIG_UUID = '6e400004-b5a3-f393-e0a9-e50e24dcca9e'; // WRITE
+const BLE_CHAR_WIFILOG_UUID = '6e400005-b5a3-f393-e0a9-e50e24dcca9e'; // READ + NOTIFY
+const BLE_CHAR_HEARTBEAT_UUID = '6e400006-b5a3-f393-e0a9-e50e24dcca9e'; // v2.3 READ + NOTIFY (opcional)
 
-const BLE_HTTP_STATUS_PATH     = '/ble-status';
-const BLE_HEARTBEAT_STALE_MS   = 15000;
-const BLE_HTTP_POLL_MS         = 10000;
-const BLE_WIFI_LOG_MAX_LINES   = 80;
+const BLE_HTTP_STATUS_PATH = '/ble-status';
+const BLE_HEARTBEAT_STALE_MS = 15000;
+const BLE_HTTP_POLL_MS = 10000;
+const BLE_WIFI_LOG_MAX_LINES = 80;
 const BLE_HTTP_BASE_STORAGE_KEY = 'agrosensor-ble-http-base';
 
 const BLE_STATE = {
@@ -1720,7 +1732,7 @@ function loadBleHttpBaseUrl() {
 function saveBleHttpBaseUrl(url) {
   try {
     if (url) localStorage.setItem(BLE_HTTP_BASE_STORAGE_KEY, url);
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function bleCandidateHttpBaseFromStatus(data) {
@@ -1730,7 +1742,7 @@ function bleCandidateHttpBaseFromStatus(data) {
     try {
       const url = new URL(rawUrl);
       return `${url.protocol}//${url.host}`;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const ip = data.ip || data.local_ip || data.wifi_ip || data.sta_ip || data.ipv4 || data.address;
@@ -1851,22 +1863,22 @@ function bleUpdateConnectedUI(connected) {
   BLE_STATE.connected = connected;
   if (!connected) BLE_STATE.lastHeartbeatAt = null;
 
-  const dot       = document.getElementById('ble-dot');
-  const dotText   = document.getElementById('ble-dot-text');
-  const connectBtn= document.getElementById('ble-connect-btn');
+  const dot = document.getElementById('ble-dot');
+  const dotText = document.getElementById('ble-dot-text');
+  const connectBtn = document.getElementById('ble-connect-btn');
   const disconnectBtn = document.getElementById('ble-disconnect-btn');
-  const panels    = document.getElementById('ble-data-panels');
+  const panels = document.getElementById('ble-data-panels');
   const heartbeat = document.getElementById('ble-heartbeat');
   const deviceName = document.getElementById('ble-device-name');
 
-  if (dot)     dot.className = `status-dot ${connected ? 'online' : 'offline'}`;
+  if (dot) dot.className = `status-dot ${connected ? 'online' : 'offline'}`;
   if (dotText) dotText.textContent = connected ? 'Conectado' : 'Desconectado';
-  if (connectBtn)    connectBtn.style.display    = connected ? 'none' : 'inline-flex';
+  if (connectBtn) connectBtn.style.display = connected ? 'none' : 'inline-flex';
   if (disconnectBtn) disconnectBtn.style.display = connected ? 'inline-flex' : 'none';
-  if (panels)        panels.style.display        = connected ? 'block' : 'none';
-  if (heartbeat)     heartbeat.style.display     = connected ? 'inline-flex' : 'none';
-  if (deviceName)    deviceName.textContent      = connected && BLE_STATE.device ? (BLE_STATE.device.name || 'AgroSensor') : '';
-  if (!connected)    setTextIfExists('ble-hb-ts', '--');
+  if (panels) panels.style.display = connected ? 'block' : 'none';
+  if (heartbeat) heartbeat.style.display = connected ? 'inline-flex' : 'none';
+  if (deviceName) deviceName.textContent = connected && BLE_STATE.device ? (BLE_STATE.device.name || 'AgroSensor') : '';
+  if (!connected) setTextIfExists('ble-hb-ts', '--');
 
   // Reflejar también en el badge de la sidebar (estado BLE rápido)
   const sideDot = document.getElementById('ble-sidebar-dot');
@@ -1897,8 +1909,8 @@ async function bleConnect() {
     const service = await server.getPrimaryService(BLE_SERVICE_UUID);
 
     BLE_STATE.charTelemetry = await service.getCharacteristic(BLE_CHAR_TELEMETRY_UUID);
-    BLE_STATE.charStatus    = await service.getCharacteristic(BLE_CHAR_STATUS_UUID);
-    BLE_STATE.charConfig    = await service.getCharacteristic(BLE_CHAR_CONFIG_UUID);
+    BLE_STATE.charStatus = await service.getCharacteristic(BLE_CHAR_STATUS_UUID);
+    BLE_STATE.charConfig = await service.getCharacteristic(BLE_CHAR_CONFIG_UUID);
 
     try {
       BLE_STATE.charHeartbeat = await service.getCharacteristic(BLE_CHAR_HEARTBEAT_UUID);
@@ -2038,13 +2050,13 @@ function bleHandleTelemetry(dataValue) {
   let data;
   try { data = JSON.parse(raw); } catch (e) { console.warn('Telemetría BLE inválida:', raw); return; }
 
-  setTextIfExists('ble-temp',      data.t          != null ? `${data.t} °C`  : '--');
-  setTextIfExists('ble-hum-aire',  data.h          != null ? `${data.h} %`   : '--');
-  setTextIfExists('ble-hum-suelo', data.soil       != null ? `${data.soil} %` : '--');
-  setTextIfExists('ble-soil-raw',  data.soil_raw   != null ? data.soil_raw   : '--');
-  setTextIfExists('ble-rssi',      data.rssi       != null ? `${data.rssi} dBm` : '--');
-  setTextIfExists('ble-interval',  data.intervalo_s != null ? `${data.intervalo_s} s` : '--');
-  setTextIfExists('ble-ts',        data.ts || '--');
+  setTextIfExists('ble-temp', data.t != null ? `${data.t} °C` : '--');
+  setTextIfExists('ble-hum-aire', data.h != null ? `${data.h} %` : '--');
+  setTextIfExists('ble-hum-suelo', data.soil != null ? `${data.soil} %` : '--');
+  setTextIfExists('ble-soil-raw', data.soil_raw != null ? data.soil_raw : '--');
+  setTextIfExists('ble-rssi', data.rssi != null ? `${data.rssi} dBm` : '--');
+  setTextIfExists('ble-interval', data.intervalo_s != null ? `${data.intervalo_s} s` : '--');
+  setTextIfExists('ble-ts', data.ts || '--');
 
   const updEl = document.getElementById('ble-last-update');
   if (updEl) updEl.textContent = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -2055,15 +2067,15 @@ function bleHandleStatus(dataValue) {
   let data;
   try { data = JSON.parse(raw); } catch (e) { console.warn('Estado BLE inválido:', raw); return; }
 
-  setTextIfExists('ble-st-wifi',     bleWifiStateLabel(data.wifi_state));
-  setTextIfExists('ble-st-mqtt',     data.mqtt_connected ? '✅ Conectado' : '❌ Desconectado');
-  setTextIfExists('ble-st-rssi',     data.rssi != null ? `${data.rssi} dBm` : '--');
+  setTextIfExists('ble-st-wifi', bleWifiStateLabel(data.wifi_state));
+  setTextIfExists('ble-st-mqtt', data.mqtt_connected ? '✅ Conectado' : '❌ Desconectado');
+  setTextIfExists('ble-st-rssi', data.rssi != null ? `${data.rssi} dBm` : '--');
   setTextIfExists('ble-st-intentos', data.wifi_intentos != null ? data.wifi_intentos : '--');
-  setTextIfExists('ble-st-heap',     data.heap != null ? `${Math.round(data.heap / 1024)} KB` : '--');
-  setTextIfExists('ble-st-hora',     data.hora_local || '--');
-  setTextIfExists('ble-st-tz',       data.timezone || '--');
-  setTextIfExists('ble-st-mac',      data.mac || '--');
-  setTextIfExists('ble-st-device',   data.device_id || '--');
+  setTextIfExists('ble-st-heap', data.heap != null ? `${Math.round(data.heap / 1024)} KB` : '--');
+  setTextIfExists('ble-st-hora', data.hora_local || '--');
+  setTextIfExists('ble-st-tz', data.timezone || '--');
+  setTextIfExists('ble-st-mac', data.mac || '--');
+  setTextIfExists('ble-st-device', data.device_id || '--');
   setTextIfExists('ble-st-interval', data.intervalo_ms != null ? `${Math.round(data.intervalo_ms / 1000)} s` : '--');
 
   const wifiBadge = document.getElementById('ble-st-wifi-badge');
@@ -2075,11 +2087,11 @@ function bleHandleStatus(dataValue) {
 
 function bleWifiStateLabel(state) {
   switch (state) {
-    case 'connected':    return '🟢 Conectado';
+    case 'connected': return '🟢 Conectado';
     case 'disconnected': return '🔴 Desconectado';
     case 'reconnecting': return '🟡 Reconectando';
-    case 'resetting':    return '🟠 Reiniciando radio';
-    default:             return state || 'Desconocido';
+    case 'resetting': return '🟠 Reiniciando radio';
+    default: return state || 'Desconocido';
   }
 }
 
@@ -2132,8 +2144,8 @@ function setTextIfExists(id, text) {
 // Envía la nueva frecuencia de medición al ESP32 vía la característica de
 // configuración BLE. Mismo formato JSON que el tópico MQTT de config.
 async function bleSaveInterval() {
-  const valueEl  = document.getElementById('ble-cfg-interval-value');
-  const unitEl   = document.getElementById('ble-cfg-interval-unit');
+  const valueEl = document.getElementById('ble-cfg-interval-value');
+  const unitEl = document.getElementById('ble-cfg-interval-unit');
   const statusEl = document.getElementById('ble-cfg-status');
   if (!valueEl || !unitEl || !statusEl) return;
 
@@ -2145,7 +2157,7 @@ async function bleSaveInterval() {
   }
 
   const value = Number(valueEl.value);
-  const unit  = unitEl.value;
+  const unit = unitEl.value;
   if (!Number.isFinite(value) || value <= 0) {
     statusEl.textContent = '❌ Ingresa un intervalo válido.';
     statusEl.style.color = 'var(--error)';
@@ -2201,6 +2213,25 @@ function setupBleUI() {
   document.getElementById('ble-cfg-save')?.addEventListener('click', bleSaveInterval);
 
   bleUpdateConnectedUI(false);
+}
+// ─────────────────────────────────────────────────────────────
+// SIDEBAR MOBILE
+// ─────────────────────────────────────────────────────────────
+
+function openSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+
+  if (sidebar) sidebar.classList.add('open');
+  if (overlay) overlay.classList.add('show');
+}
+
+function closeSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+
+  if (sidebar) sidebar.classList.remove('open');
+  if (overlay) overlay.classList.remove('show');
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
