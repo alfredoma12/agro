@@ -1895,7 +1895,9 @@ async function bleConnect() {
     bleSetStatusMsg('Buscando dispositivos AgroSensor cercanos...', 'info');
 
     const bleDevice = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: 'AgroSensor-' }],
+      filters: [{
+        services: [BLE_SERVICE_UUID]
+      }],
       optionalServices: [BLE_SERVICE_UUID]
     });
 
