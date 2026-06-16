@@ -1675,230 +1675,50 @@ function setupPwaInstallPrompt() {
 //  Requisitos del navegador: Chrome/Edge (escritorio y Android) con Web Bluetooth.
 //  NO soportado en iOS Safari — limitación del navegador, no del firmware.
 // ════════════════════════════════════════════════════════════════════════════
-async function bleConnect() {
-  if (!bleSupported()) {
-    bleSetStatusMsg(
-      'Tu navegador no soporta Web Bluetooth. Usa Chrome o Edge (escritorio o Android).',
-      'err'
-    );
-    return;
-  }
+// ════════════════════════════════════════════════════════════════════════════
+//  BLUETOOTH LOW ENERGY
+// ════════════════════════════════════════════════════════════════════════════
 
-  let bleDevice = null;
+// ── Constantes BLE (deben ir ANTES de cualquier función que las use) ─────────
+const BLE_SERVICE_UUID        = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const BLE_CHAR_TELEMETRY_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+const BLE_CHAR_STATUS_UUID    = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+const BLE_CHAR_CONFIG_UUID    = '6e400004-b5a3-f393-e0a9-e50e24dcca9e';
+const BLE_CHAR_WIFILOG_UUID   = '6e400005-b5a3-f393-e0a9-e50e24dcca9e';
+const BLE_CHAR_HEARTBEAT_UUID = '6e400006-b5a3-f393-e0a9-e50e24dcca9e';
 
-  // ── Intento 1: filtro estricto por UUID de servicio ──────────────────────
-  // Es lo correcto, pero algunos firmwares NimBLE no incluyen el UUID completo
-  // (128 bits) en el paquete de advertising por espacio, así que puede fallar.
-  try {
-    bleSetStatusMsg('Buscando dispositivos AgroSensor (filtro UUID)…', 'info');
-    bleDevice = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [BLE_SERVICE_UUID] }],
-      optionalServices: [BLE_SERVICE_UUID]
-    });
-  } catch (e1) {
-    if (e1.name === 'NotFoundError') {
-      // El usuario canceló el diálogo — no seguir intentando.
-      bleSetStatusMsg('No se seleccionó ningún dispositivo.', 'err');
-      bleUpdateConnectedUI(false);
-      return;
-    }
-    // Cualquier otro error (SecurityError, etc.) → probar siguiente estrategia
-    console.warn('[BLE] Intento 1 (UUID filter) falló:', e1.message);
-  }
-
-  // ── Intento 2: filtro por prefijo de nombre ───────────────────────────────
-  // NimBLE siempre incluye el nombre completo en el advertising, así que esto
-  // suele funcionar cuando el UUID no aparece.
-  if (!bleDevice) {
-    try {
-      bleSetStatusMsg('Buscando dispositivos AgroSensor (filtro nombre)…', 'info');
-      bleDevice = await navigator.bluetooth.requestDevice({
-        filters: [{ namePrefix: 'AgroSensor-' }],
-        optionalServices: [BLE_SERVICE_UUID]
-      });
-    } catch (e2) {
-      if (e2.name === 'NotFoundError') {
-        bleSetStatusMsg('No se seleccionó ningún dispositivo.', 'err');
-        bleUpdateConnectedUI(false);
-        return;
-      }
-      console.warn('[BLE] Intento 2 (name prefix) falló:', e2.message);
-    }
-  }
-
-  // ── Intento 3: escaneo abierto (acceptAllDevices) ─────────────────────────
-  // Último recurso: el usuario ve TODOS los dispositivos BLE cercanos y elige.
-  // Chrome muestra una advertencia de seguridad, pero funciona.
-  if (!bleDevice) {
-    try {
-      bleSetStatusMsg('Abriendo selector de todos los dispositivos BLE…', 'info');
-      bleDevice = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [BLE_SERVICE_UUID]
-      });
-    } catch (e3) {
-      if (e3.name === 'NotFoundError') {
-        bleSetStatusMsg('No se seleccionó ningún dispositivo.', 'err');
-      } else {
-        bleSetStatusMsg(`❌ Error al conectar: ${e3.message || e3}`, 'err');
-      }
-      bleUpdateConnectedUI(false);
-      return;
-    }
-  }
-
-  // ── A partir de aquí tenemos un dispositivo seleccionado ─────────────────
-  // Verificar que sea realmente un AgroSensor antes de continuar
-  const deviceName = bleDevice.name || '';
-  if (deviceName && !deviceName.startsWith('AgroSensor-') && !deviceName.includes('Agro')) {
-    const confirmed = confirm(
-      `El dispositivo seleccionado se llama "${deviceName}".\n` +
-      `¿Es tu AgroSensor? (esperado: "AgroSensor-XXXX")`
-    );
-    if (!confirmed) {
-      bleSetStatusMsg('Conexión cancelada por el usuario.', 'info');
-      bleUpdateConnectedUI(false);
-      return;
-    }
-  }
-
-  BLE_STATE.device = bleDevice;
-  bleDevice.addEventListener('gattserverdisconnected', onBleDisconnected);
-
-  try {
-    bleSetStatusMsg(`Conectando a ${deviceName || 'dispositivo'}…`, 'info');
-    const server = await bleDevice.gatt.connect();
-    BLE_STATE.server = server;
-
-    // Obtener el servicio principal — aquí es donde realmente verificamos
-    // que el dispositivo expone el UUID correcto.
-    let service;
-    try {
-      service = await server.getPrimaryService(BLE_SERVICE_UUID);
-    } catch (svcErr) {
-      bleSetStatusMsg(
-        `❌ El dispositivo no expone el servicio AgroSensor. ` +
-        `Verifica que el firmware esté corriendo. (${svcErr.message})`,
-        'err'
-      );
-      bleDevice.gatt.disconnect();
-      bleUpdateConnectedUI(false);
-      return;
-    }
-
-    // ── Obtener características ───────────────────────────────────────────
-    BLE_STATE.charTelemetry = await service.getCharacteristic(BLE_CHAR_TELEMETRY_UUID);
-    BLE_STATE.charStatus = await service.getCharacteristic(BLE_CHAR_STATUS_UUID);
-    BLE_STATE.charConfig = await service.getCharacteristic(BLE_CHAR_CONFIG_UUID);
-
-    try {
-      BLE_STATE.charHeartbeat = await service.getCharacteristic(BLE_CHAR_HEARTBEAT_UUID);
-    } catch (_) {
-      BLE_STATE.charHeartbeat = null;
-    }
-
-    try {
-      BLE_STATE.charWifiLog = await service.getCharacteristic(BLE_CHAR_WIFILOG_UUID);
-    } catch (_) {
-      BLE_STATE.charWifiLog = null;
-      console.warn('[BLE] WiFi log char no disponible (firmware < v2.2)');
-    }
-
-    // ── Suscribir notificaciones ──────────────────────────────────────────
-    await BLE_STATE.charTelemetry.startNotifications();
-    BLE_STATE.charTelemetry.addEventListener('characteristicvaluechanged', ev => {
-      bleHandleTelemetry(ev.target.value);
-    });
-
-    if (BLE_STATE.charWifiLog) {
-      try {
-        await BLE_STATE.charWifiLog.startNotifications();
-        BLE_STATE.charWifiLog.addEventListener('characteristicvaluechanged', ev => {
-          bleHandleWifiLog(ev.target.value);
-        });
-      } catch (_) { }
-    }
-
-    if (BLE_STATE.charHeartbeat) {
-      try {
-        await BLE_STATE.charHeartbeat.startNotifications();
-        BLE_STATE.charHeartbeat.addEventListener('characteristicvaluechanged', ev => {
-          bleHandleHeartbeat(ev.target.value);
-        });
-      } catch (_) { }
-    }
-
-    // ── Conectado ─────────────────────────────────────────────────────────
-    bleUpdateConnectedUI(true);
-    bleMarkHeartbeat('BLE');
-    bleStartRuntimeMonitors();
-    bleSetStatusMsg(`✅ Conectado a ${deviceName || 'AgroSensor'}.`, 'ok');
-
-    // Lecturas iniciales
-    await bleReadHeartbeat();
-    await bleReadTelemetry();
-    await bleReadStatus();
-    await bleReadWifiLog();
-    await bleFetchHttpStatus();
-
-    // Poll periódico de estado + log
-    if (BLE_STATE.statusPollTimer) clearInterval(BLE_STATE.statusPollTimer);
-    BLE_STATE.statusPollTimer = setInterval(() => {
-      if (BLE_STATE.connected) {
-        bleReadHeartbeat();
-        bleReadStatus();
-        bleReadWifiLog();
-        bleFetchHttpStatus();
-      }
-    }, 10000);
-
-  } catch (connErr) {
-    console.error('[BLE] Error al conectar GATT:', connErr);
-    bleSetStatusMsg(`❌ Error: ${connErr.message || connErr}`, 'err');
-    bleUpdateConnectedUI(false);
-  }
-}
-const BLE_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-const BLE_CHAR_TELEMETRY_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // READ + NOTIFY
-const BLE_CHAR_STATUS_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // READ
-const BLE_CHAR_CONFIG_UUID = '6e400004-b5a3-f393-e0a9-e50e24dcca9e'; // WRITE
-const BLE_CHAR_WIFILOG_UUID = '6e400005-b5a3-f393-e0a9-e50e24dcca9e'; // READ + NOTIFY
-const BLE_CHAR_HEARTBEAT_UUID = '6e400006-b5a3-f393-e0a9-e50e24dcca9e'; // v2.3 READ + NOTIFY (opcional)
-
-const BLE_HTTP_STATUS_PATH = '/ble-status';
-const BLE_HEARTBEAT_STALE_MS = 15000;
-const BLE_HTTP_POLL_MS = 10000;
-const BLE_WIFI_LOG_MAX_LINES = 80;
+const BLE_HTTP_STATUS_PATH    = '/ble-status';
+const BLE_HEARTBEAT_STALE_MS  = 15000;
+const BLE_HTTP_POLL_MS        = 10000;
 const BLE_HTTP_BASE_STORAGE_KEY = 'agrosensor-ble-http-base';
 
 const BLE_STATE = {
-  device: null,
-  server: null,
-  charTelemetry: null,
-  charStatus: null,
-  charConfig: null,
-  charWifiLog: null,
-  charHeartbeat: null,
+  device: null, server: null,
+  charTelemetry: null, charStatus: null, charConfig: null,
+  charWifiLog: null, charHeartbeat: null,
   connected: false,
-  statusPollTimer: null,
-  heartbeatWatchTimer: null,
-  httpPollTimer: null,
+  statusPollTimer: null, heartbeatWatchTimer: null, httpPollTimer: null,
   lastHeartbeatAt: null,
   espHttpBaseUrl: loadBleHttpBaseUrl()
 };
 
-function bleSupported() {
-  return 'bluetooth' in navigator;
+// ── Helpers de bajo nivel ─────────────────────────────────────────────────────
+
+function bleSupported() { return 'bluetooth' in navigator; }
+
+function loadBleHttpBaseUrl() {
+  try { return localStorage.getItem(BLE_HTTP_BASE_STORAGE_KEY) || ''; } catch (_) { return ''; }
 }
 
-// Decodifica un DataView/ArrayBuffer BLE a string UTF-8
+function saveBleHttpBaseUrl(url) {
+  try { if (url) localStorage.setItem(BLE_HTTP_BASE_STORAGE_KEY, url); } catch (_) { }
+}
+
 function bleValueToString(dataValue) {
   try {
     const decoder = new TextDecoder('utf-8');
     return decoder.decode(dataValue.buffer ? dataValue : new DataView(dataValue));
-  } catch (e) {
-    return '';
-  }
+  } catch (_) { return ''; }
 }
 
 function bleParseJsonValue(dataValue, fallback = null) {
@@ -1907,26 +1727,25 @@ function bleParseJsonValue(dataValue, fallback = null) {
   try { return JSON.parse(raw); } catch (_) { return fallback; }
 }
 
-function loadBleHttpBaseUrl() {
-  try { return localStorage.getItem(BLE_HTTP_BASE_STORAGE_KEY) || ''; } catch (_) { return ''; }
+function setTextIfExists(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
 }
 
-function saveBleHttpBaseUrl(url) {
-  try {
-    if (url) localStorage.setItem(BLE_HTTP_BASE_STORAGE_KEY, url);
-  } catch (_) { }
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+// ── URL HTTP del ESP32 ────────────────────────────────────────────────────────
 
 function bleCandidateHttpBaseFromStatus(data) {
   if (!data || typeof data !== 'object') return '';
   const rawUrl = data.ble_status_url || data.http_url || data.status_url || data.web_url || '';
   if (/^https?:\/\//i.test(String(rawUrl))) {
-    try {
-      const url = new URL(rawUrl);
-      return `${url.protocol}//${url.host}`;
-    } catch (_) { }
+    try { const u = new URL(rawUrl); return `${u.protocol}//${u.host}`; } catch (_) { }
   }
-
   const ip = data.ip || data.local_ip || data.wifi_ip || data.sta_ip || data.ipv4 || data.address;
   if (!ip || !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(String(ip))) return '';
   const port = data.http_port || data.web_port || 80;
@@ -1940,25 +1759,17 @@ function bleRememberHttpBaseUrl(data) {
   saveBleHttpBaseUrl(baseUrl);
 }
 
+// ── Heartbeat ─────────────────────────────────────────────────────────────────
+
 function bleMarkHeartbeat(source = 'BLE', payload = null) {
   BLE_STATE.lastHeartbeatAt = Date.now();
-
   const hb = document.getElementById('ble-heartbeat');
   if (hb) hb.style.display = 'inline-flex';
-
   const pulse = document.getElementById('ble-hb-pulse');
-  if (pulse) {
-    pulse.classList.remove('active');
-    void pulse.offsetWidth;
-    pulse.classList.add('active');
-  }
-
-  const tsText = new Date(BLE_STATE.lastHeartbeatAt).toLocaleTimeString('es-CL', {
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-  });
-  const suffix = payload && typeof payload === 'object' && payload.uptime_s != null
-    ? ` · uptime ${Math.round(Number(payload.uptime_s))}s`
-    : '';
+  if (pulse) { pulse.classList.remove('active'); void pulse.offsetWidth; pulse.classList.add('active'); }
+  const tsText = new Date(BLE_STATE.lastHeartbeatAt).toLocaleTimeString('es-CL',
+    { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const suffix = payload?.uptime_s != null ? ` · uptime ${Math.round(Number(payload.uptime_s))}s` : '';
   setTextIfExists('ble-hb-ts', `Heartbeat ${source}: ${tsText}${suffix}`);
 }
 
@@ -1967,7 +1778,6 @@ function bleCheckHeartbeatFreshness() {
   const ageMs = Date.now() - BLE_STATE.lastHeartbeatAt;
   const dot = document.getElementById('ble-dot');
   const sideDot = document.getElementById('ble-sidebar-dot');
-
   if (ageMs > BLE_HEARTBEAT_STALE_MS) {
     if (dot) dot.className = 'status-dot warn';
     if (sideDot) sideDot.className = 'status-dot warn';
@@ -1978,6 +1788,8 @@ function bleCheckHeartbeatFreshness() {
   }
 }
 
+// ── Monitores en background ───────────────────────────────────────────────────
+
 function bleStartRuntimeMonitors() {
   bleStopRuntimeMonitors();
   BLE_STATE.heartbeatWatchTimer = setInterval(bleCheckHeartbeatFreshness, 3000);
@@ -1987,51 +1799,43 @@ function bleStartRuntimeMonitors() {
 }
 
 function bleStopRuntimeMonitors() {
-  if (BLE_STATE.heartbeatWatchTimer) {
-    clearInterval(BLE_STATE.heartbeatWatchTimer);
-    BLE_STATE.heartbeatWatchTimer = null;
-  }
-  if (BLE_STATE.httpPollTimer) {
-    clearInterval(BLE_STATE.httpPollTimer);
-    BLE_STATE.httpPollTimer = null;
-  }
+  if (BLE_STATE.heartbeatWatchTimer) { clearInterval(BLE_STATE.heartbeatWatchTimer); BLE_STATE.heartbeatWatchTimer = null; }
+  if (BLE_STATE.httpPollTimer)       { clearInterval(BLE_STATE.httpPollTimer);       BLE_STATE.httpPollTimer = null; }
 }
+
+// ── HTTP polling al ESP32 ─────────────────────────────────────────────────────
 
 async function bleFetchHttpStatus() {
   if (!BLE_STATE.espHttpBaseUrl) return null;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 2500);
   try {
-    const response = await fetch(`${BLE_STATE.espHttpBaseUrl}${BLE_HTTP_STATUS_PATH}`, {
-      cache: 'no-store',
-      signal: controller.signal
-    });
+    const response = await fetch(`${BLE_STATE.espHttpBaseUrl}${BLE_HTTP_STATUS_PATH}`,
+      { cache: 'no-store', signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     bleApplyHttpStatus(data);
     return data;
   } catch (e) {
-    console.warn('No se pudo consultar /ble-status del ESP32:', e);
+    console.warn('[BLE] /ble-status falló:', e.message);
     return null;
-  } finally {
-    clearTimeout(timeout);
-  }
+  } finally { clearTimeout(timeout); }
 }
 
 function bleApplyHttpStatus(data) {
   if (!data || typeof data !== 'object') return;
   bleRememberHttpBaseUrl(data);
   bleMarkHeartbeat('HTTP', data);
-
-  const normalized = {
+  bleRenderStatus({
     ...data,
-    wifi_state: data.wifi_state || data.wifi || data.wifiStatus,
+    wifi_state:     data.wifi_state || data.wifi || data.wifiStatus,
     mqtt_connected: data.mqtt_connected ?? data.mqtt ?? data.mqttConnected,
-    intervalo_ms: data.intervalo_ms ?? data.interval_ms,
-    intervalo_s: data.intervalo_s ?? data.interval_s
-  };
-  bleRenderStatus(normalized);
+    intervalo_ms:   data.intervalo_ms ?? data.interval_ms,
+    intervalo_s:    data.intervalo_s  ?? data.interval_s
+  });
 }
+
+// ── UI de estado ──────────────────────────────────────────────────────────────
 
 function bleSetStatusMsg(msg, kind = 'info') {
   const el = document.getElementById('ble-conn-status');
@@ -2045,107 +1849,112 @@ function bleUpdateConnectedUI(connected) {
   BLE_STATE.connected = connected;
   if (!connected) BLE_STATE.lastHeartbeatAt = null;
 
-  const dot = document.getElementById('ble-dot');
-  const dotText = document.getElementById('ble-dot-text');
+  const dot        = document.getElementById('ble-dot');
+  const dotText    = document.getElementById('ble-dot-text');
   const connectBtn = document.getElementById('ble-connect-btn');
-  const disconnectBtn = document.getElementById('ble-disconnect-btn');
-  const panels = document.getElementById('ble-data-panels');
-  const heartbeat = document.getElementById('ble-heartbeat');
-  const deviceName = document.getElementById('ble-device-name');
+  const discBtn    = document.getElementById('ble-disconnect-btn');
+  const panels     = document.getElementById('ble-data-panels');
+  const heartbeat  = document.getElementById('ble-heartbeat');
+  const nameEl     = document.getElementById('ble-device-name');
+  const sideDot    = document.getElementById('ble-sidebar-dot');
 
-  if (dot) dot.className = `status-dot ${connected ? 'online' : 'offline'}`;
-  if (dotText) dotText.textContent = connected ? 'Conectado' : 'Desconectado';
+  if (dot)        dot.className = `status-dot ${connected ? 'online' : 'offline'}`;
+  if (dotText)    dotText.textContent = connected ? 'Conectado' : 'Desconectado';
   if (connectBtn) connectBtn.style.display = connected ? 'none' : 'inline-flex';
-  if (disconnectBtn) disconnectBtn.style.display = connected ? 'inline-flex' : 'none';
-  if (panels) panels.style.display = connected ? 'block' : 'none';
-  if (heartbeat) heartbeat.style.display = connected ? 'inline-flex' : 'none';
-  if (deviceName) deviceName.textContent = connected && BLE_STATE.device ? (BLE_STATE.device.name || 'AgroSensor') : '';
+  if (discBtn)    discBtn.style.display    = connected ? 'inline-flex' : 'none';
+  if (panels)     panels.style.display     = connected ? 'block' : 'none';
+  if (heartbeat)  heartbeat.style.display  = connected ? 'inline-flex' : 'none';
+  if (nameEl)     nameEl.textContent = connected && BLE_STATE.device ? (BLE_STATE.device.name || 'AgroSensor') : '';
+  if (sideDot)    sideDot.className = `status-dot ${connected ? 'online' : 'offline'}`;
   if (!connected) setTextIfExists('ble-hb-ts', '--');
-
-  // Reflejar también en el badge de la sidebar (estado BLE rápido)
-  const sideDot = document.getElementById('ble-sidebar-dot');
-  if (sideDot) sideDot.className = `status-dot ${connected ? 'online' : 'offline'}`;
 }
 
-// Pegar en consola — lista dispositivos sin filtro para diagnóstico
-navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] })
-  .then(d => console.log('Encontrado:', d.name, d.id))
-  .catch(e => console.error(e));
+// ── Handlers de desconexión ───────────────────────────────────────────────────
+
+function onBleDisconnected() {
+  bleStopRuntimeMonitors();
+  bleUpdateConnectedUI(false);
+  bleSetStatusMsg('🔌 Dispositivo desconectado.', 'info');
+  if (BLE_STATE.statusPollTimer) { clearInterval(BLE_STATE.statusPollTimer); BLE_STATE.statusPollTimer = null; }
+  BLE_STATE.server = null;
+  BLE_STATE.charTelemetry = null;
+  BLE_STATE.charStatus = null;
+  BLE_STATE.charConfig = null;
+  BLE_STATE.charWifiLog = null;
+}
 
 function bleDisconnect() {
-  if (BLE_STATE.device && BLE_STATE.device.gatt && BLE_STATE.device.gatt.connected) {
+  if (BLE_STATE.device?.gatt?.connected) {
     BLE_STATE.device.gatt.disconnect();
   } else {
     onBleDisconnected();
   }
 }
 
+// ── Lectura de características ────────────────────────────────────────────────
+
 async function bleReadTelemetry() {
   if (!BLE_STATE.charTelemetry) return;
-  try {
-    const value = await BLE_STATE.charTelemetry.readValue();
-    bleHandleTelemetry(value);
-  } catch (e) {
-    console.warn('Error leyendo telemetría BLE:', e);
-  }
+  try { bleHandleTelemetry(await BLE_STATE.charTelemetry.readValue()); }
+  catch (e) { console.warn('[BLE] Error leyendo telemetría:', e); }
 }
 
 async function bleReadStatus() {
   if (!BLE_STATE.charStatus) return;
-  try {
-    const value = await BLE_STATE.charStatus.readValue();
-    bleHandleStatus(value);
-  } catch (e) {
-    console.warn('Error leyendo estado BLE:', e);
-  }
+  try { bleHandleStatus(await BLE_STATE.charStatus.readValue()); }
+  catch (e) { console.warn('[BLE] Error leyendo estado:', e); }
 }
 
 async function bleReadWifiLog() {
-  if (!BLE_STATE.charWifiLog) {
-    bleRenderWifiLogUnavailable();
-    return;
-  }
-  try {
-    const value = await BLE_STATE.charWifiLog.readValue();
-    bleHandleWifiLog(value);
-  } catch (e) {
-    console.warn('Error leyendo log WiFi BLE:', e);
-  }
+  if (!BLE_STATE.charWifiLog) { bleRenderWifiLogUnavailable(); return; }
+  try { bleHandleWifiLog(await BLE_STATE.charWifiLog.readValue()); }
+  catch (e) { console.warn('[BLE] Error leyendo WiFi log:', e); }
+}
+
+async function bleReadHeartbeat() {
+  if (!BLE_STATE.charHeartbeat) return;
+  try { bleHandleHeartbeat(await BLE_STATE.charHeartbeat.readValue()); }
+  catch (e) { console.warn('[BLE] Error leyendo heartbeat:', e); }
+}
+
+// ── Handlers de datos entrantes ───────────────────────────────────────────────
+
+function bleHandleHeartbeat(dataValue) {
+  bleMarkHeartbeat('BLE', bleParseJsonValue(dataValue, {}));
 }
 
 function bleHandleTelemetry(dataValue) {
-  const raw = bleValueToString(dataValue);
-  let data;
-  try { data = JSON.parse(raw); } catch (e) { console.warn('Telemetría BLE inválida:', raw); return; }
-
-  setTextIfExists('ble-temp', data.t != null ? `${data.t} °C` : '--');
-  setTextIfExists('ble-hum-aire', data.h != null ? `${data.h} %` : '--');
-  setTextIfExists('ble-hum-suelo', data.soil != null ? `${data.soil} %` : '--');
+  const data = bleParseJsonValue(dataValue, null);
+  if (!data) { console.warn('[BLE] Telemetría inválida'); return; }
+  setTextIfExists('ble-temp',     data.t    != null ? `${data.t} °C`   : '--');
+  setTextIfExists('ble-hum-aire', data.h    != null ? `${data.h} %`    : '--');
+  setTextIfExists('ble-hum-suelo',data.soil != null ? `${data.soil} %` : '--');
   setTextIfExists('ble-soil-raw', data.soil_raw != null ? data.soil_raw : '--');
-  setTextIfExists('ble-rssi', data.rssi != null ? `${data.rssi} dBm` : '--');
+  setTextIfExists('ble-rssi',     data.rssi != null ? `${data.rssi} dBm` : '--');
   setTextIfExists('ble-interval', data.intervalo_s != null ? `${data.intervalo_s} s` : '--');
-  setTextIfExists('ble-ts', data.ts || '--');
-
+  setTextIfExists('ble-ts',       data.ts || '--');
   const updEl = document.getElementById('ble-last-update');
-  if (updEl) updEl.textContent = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  if (updEl) updEl.textContent = new Date().toLocaleTimeString('es-CL',
+    { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
 
 function bleHandleStatus(dataValue) {
-  const raw = bleValueToString(dataValue);
-  let data;
-  try { data = JSON.parse(raw); } catch (e) { console.warn('Estado BLE inválido:', raw); return; }
+  const data = bleParseJsonValue(dataValue, null);
+  if (!data) { console.warn('[BLE] Estado inválido'); return; }
+  bleRenderStatus(data);
+}
 
-  setTextIfExists('ble-st-wifi', bleWifiStateLabel(data.wifi_state));
-  setTextIfExists('ble-st-mqtt', data.mqtt_connected ? '✅ Conectado' : '❌ Desconectado');
-  setTextIfExists('ble-st-rssi', data.rssi != null ? `${data.rssi} dBm` : '--');
-  setTextIfExists('ble-st-intentos', data.wifi_intentos != null ? data.wifi_intentos : '--');
-  setTextIfExists('ble-st-heap', data.heap != null ? `${Math.round(data.heap / 1024)} KB` : '--');
-  setTextIfExists('ble-st-hora', data.hora_local || '--');
-  setTextIfExists('ble-st-tz', data.timezone || '--');
-  setTextIfExists('ble-st-mac', data.mac || '--');
-  setTextIfExists('ble-st-device', data.device_id || '--');
+function bleRenderStatus(data) {
+  setTextIfExists('ble-st-wifi',     bleWifiStateLabel(data.wifi_state));
+  setTextIfExists('ble-st-mqtt',     data.mqtt_connected ? '✅ Conectado' : '❌ Desconectado');
+  setTextIfExists('ble-st-rssi',     data.rssi      != null ? `${data.rssi} dBm`                    : '--');
+  setTextIfExists('ble-st-intentos', data.wifi_intentos != null ? data.wifi_intentos                : '--');
+  setTextIfExists('ble-st-heap',     data.heap      != null ? `${Math.round(data.heap / 1024)} KB`  : '--');
+  setTextIfExists('ble-st-hora',     data.hora_local || '--');
+  setTextIfExists('ble-st-tz',       data.timezone  || '--');
+  setTextIfExists('ble-st-mac',      data.mac       || '--');
+  setTextIfExists('ble-st-device',   data.device_id || '--');
   setTextIfExists('ble-st-interval', data.intervalo_ms != null ? `${Math.round(data.intervalo_ms / 1000)} s` : '--');
-
   const wifiBadge = document.getElementById('ble-st-wifi-badge');
   if (wifiBadge) {
     wifiBadge.className = 'status-badge ' + (data.wifi_state === 'connected' ? 'status-online' : 'status-offline');
@@ -2155,82 +1964,53 @@ function bleHandleStatus(dataValue) {
 
 function bleWifiStateLabel(state) {
   switch (state) {
-    case 'connected': return '🟢 Conectado';
-    case 'disconnected': return '🔴 Desconectado';
-    case 'reconnecting': return '🟡 Reconectando';
-    case 'resetting': return '🟠 Reiniciando radio';
-    default: return state || 'Desconocido';
+    case 'connected':   return '🟢 Conectado';
+    case 'disconnected':return '🔴 Desconectado';
+    case 'reconnecting':return '🟡 Reconectando';
+    case 'resetting':   return '🟠 Reiniciando radio';
+    default:            return state || 'Desconocido';
   }
 }
 
 function bleHandleWifiLog(dataValue) {
   const raw = bleValueToString(dataValue);
   let lines;
-  try {
-    lines = JSON.parse(raw);
-    if (!Array.isArray(lines)) lines = [String(raw)];
-  } catch (e) {
-    lines = [raw];
-  }
+  try { lines = JSON.parse(raw); if (!Array.isArray(lines)) lines = [String(raw)]; }
+  catch (_) { lines = [raw]; }
   bleRenderWifiLog(lines);
 }
 
 function bleRenderWifiLog(lines) {
-  const consoleEl = document.getElementById('ble-log-console');
-  if (!consoleEl) return;
-
-  if (!lines || !lines.length) {
-    consoleEl.innerHTML = '<div class="log-empty">Sin eventos registrados.</div>';
-    return;
-  }
-
-  // Más reciente primero
-  const ordered = [...lines].reverse();
-  consoleEl.innerHTML = ordered.map(line => `<div class="log-line"><span class="log-msg">${escapeHtml(line)}</span></div>`).join('');
+  const el = document.getElementById('ble-log-console');
+  if (!el) return;
+  if (!lines?.length) { el.innerHTML = '<div class="log-empty">Sin eventos registrados.</div>'; return; }
+  el.innerHTML = [...lines].reverse()
+    .map(line => `<div class="log-line"><span class="log-msg">${escapeHtml(line)}</span></div>`).join('');
 }
 
 function bleRenderWifiLogUnavailable() {
-  const consoleEl = document.getElementById('ble-log-console');
-  if (!consoleEl) return;
-  consoleEl.innerHTML = '<div class="log-empty">Este firmware no expone el log WiFi por BLE (requiere v2.2+).</div>';
+  const el = document.getElementById('ble-log-console');
+  if (el) el.innerHTML = '<div class="log-empty">Este firmware no expone el log WiFi por BLE (requiere v2.2+).</div>';
 }
 
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+// ── Guardar intervalo vía BLE ─────────────────────────────────────────────────
 
-function setTextIfExists(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text;
-}
-
-// Envía la nueva frecuencia de medición al ESP32 vía la característica de
-// configuración BLE. Mismo formato JSON que el tópico MQTT de config.
 async function bleSaveInterval() {
-  const valueEl = document.getElementById('ble-cfg-interval-value');
-  const unitEl = document.getElementById('ble-cfg-interval-unit');
+  const valueEl  = document.getElementById('ble-cfg-interval-value');
+  const unitEl   = document.getElementById('ble-cfg-interval-unit');
   const statusEl = document.getElementById('ble-cfg-status');
   if (!valueEl || !unitEl || !statusEl) return;
 
   if (!BLE_STATE.charConfig) {
     statusEl.textContent = '❌ No hay conexión BLE activa.';
-    statusEl.style.color = 'var(--error)';
-    statusEl.style.display = 'block';
-    return;
+    statusEl.style.color = 'var(--error)'; statusEl.style.display = 'block'; return;
   }
 
   const value = Number(valueEl.value);
-  const unit = unitEl.value;
+  const unit  = unitEl.value;
   if (!Number.isFinite(value) || value <= 0) {
     statusEl.textContent = '❌ Ingresa un intervalo válido.';
-    statusEl.style.color = 'var(--error)';
-    statusEl.style.display = 'block';
-    return;
+    statusEl.style.color = 'var(--error)'; statusEl.style.display = 'block'; return;
   }
 
   let seconds = value;
@@ -2239,47 +2019,176 @@ async function bleSaveInterval() {
 
   if (seconds < 5) {
     statusEl.textContent = '❌ El intervalo mínimo es 5 segundos.';
-    statusEl.style.color = 'var(--error)';
-    statusEl.style.display = 'block';
-    return;
+    statusEl.style.color = 'var(--error)'; statusEl.style.display = 'block'; return;
   }
 
   try {
-    const payload = JSON.stringify({ intervalo_s: seconds });
-    const encoder = new TextEncoder();
-    await BLE_STATE.charConfig.writeValue(encoder.encode(payload));
-
+    await BLE_STATE.charConfig.writeValue(new TextEncoder().encode(JSON.stringify({ intervalo_s: seconds })));
     statusEl.textContent = '✅ Intervalo enviado al dispositivo por Bluetooth.';
-    statusEl.style.color = 'var(--success)';
-    statusEl.style.display = 'block';
+    statusEl.style.color = 'var(--success)'; statusEl.style.display = 'block';
     setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
-
-    // Refrescar estado/telemetría tras un breve delay
     setTimeout(() => { bleReadStatus(); bleReadTelemetry(); }, 1500);
   } catch (e) {
-    console.error('Error escribiendo config BLE:', e);
+    console.error('[BLE] Error escribiendo config:', e);
     statusEl.textContent = '❌ No se pudo enviar la configuración por Bluetooth.';
-    statusEl.style.color = 'var(--error)';
-    statusEl.style.display = 'block';
+    statusEl.style.color = 'var(--error)'; statusEl.style.display = 'block';
   }
 }
 
-function setupBleUI() {
+// ── CONEXIÓN PRINCIPAL ────────────────────────────────────────────────────────
+
+async function bleConnect() {
   if (!bleSupported()) {
-    bleSetStatusMsg('Tu navegador no soporta Web Bluetooth. Usa Chrome o Edge (escritorio o Android). No disponible en iOS Safari.', 'err');
-    const connectBtn = document.getElementById('ble-connect-btn');
-    if (connectBtn) connectBtn.disabled = true;
+    bleSetStatusMsg('Tu navegador no soporta Web Bluetooth. Usa Chrome o Edge (escritorio o Android).', 'err');
+    return;
   }
 
-  document.getElementById('ble-connect-btn')?.addEventListener('click', bleConnect);
-  document.getElementById('ble-disconnect-btn')?.addEventListener('click', bleDisconnect);
-  document.getElementById('ble-refresh-btn')?.addEventListener('click', () => {
-    bleReadTelemetry();
-    bleReadStatus();
-    bleReadWifiLog();
-  });
-  document.getElementById('ble-cfg-save')?.addEventListener('click', bleSaveInterval);
+  let bleDevice = null;
 
+  // Intento 1: filtro por UUID de servicio
+  try {
+    bleSetStatusMsg('Buscando dispositivos AgroSensor (filtro UUID)…', 'info');
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [BLE_SERVICE_UUID] }],
+      optionalServices: [BLE_SERVICE_UUID]
+    });
+  } catch (e1) {
+    if (e1.name === 'NotFoundError') {
+      bleSetStatusMsg('No se seleccionó ningún dispositivo.', 'err');
+      bleUpdateConnectedUI(false); return;
+    }
+    console.warn('[BLE] Intento 1 (UUID) falló:', e1.message);
+  }
+
+  // Intento 2: filtro por nombre
+  if (!bleDevice) {
+    try {
+      bleSetStatusMsg('Buscando por nombre "AgroSensor-"…', 'info');
+      bleDevice = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: 'AgroSensor-' }],
+        optionalServices: [BLE_SERVICE_UUID]
+      });
+    } catch (e2) {
+      if (e2.name === 'NotFoundError') {
+        bleSetStatusMsg('No se seleccionó ningún dispositivo.', 'err');
+        bleUpdateConnectedUI(false); return;
+      }
+      console.warn('[BLE] Intento 2 (nombre) falló:', e2.message);
+    }
+  }
+
+  // Intento 3: todos los dispositivos
+  if (!bleDevice) {
+    try {
+      bleSetStatusMsg('Mostrando todos los dispositivos BLE cercanos…', 'info');
+      bleDevice = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: [BLE_SERVICE_UUID]
+      });
+    } catch (e3) {
+      bleSetStatusMsg(e3.name === 'NotFoundError'
+        ? 'No se seleccionó ningún dispositivo.'
+        : `❌ Error: ${e3.message}`, 'err');
+      bleUpdateConnectedUI(false); return;
+    }
+  }
+
+  // Verificar nombre si vino del intento 3
+  const deviceName = bleDevice.name || '';
+  if (deviceName && !deviceName.startsWith('AgroSensor-') && !deviceName.includes('Agro')) {
+    if (!confirm(`El dispositivo "${deviceName}" no parece un AgroSensor.\n¿Continuar de todas formas?`)) {
+      bleSetStatusMsg('Conexión cancelada.', 'info');
+      bleUpdateConnectedUI(false); return;
+    }
+  }
+
+  BLE_STATE.device = bleDevice;
+  bleDevice.addEventListener('gattserverdisconnected', onBleDisconnected);
+
+  try {
+    bleSetStatusMsg(`Conectando a ${deviceName || 'dispositivo'}…`, 'info');
+    const server = await bleDevice.gatt.connect();
+    BLE_STATE.server = server;
+
+    let service;
+    try {
+      service = await server.getPrimaryService(BLE_SERVICE_UUID);
+    } catch (svcErr) {
+      bleSetStatusMsg(`❌ El dispositivo no expone el servicio AgroSensor. (${svcErr.message})`, 'err');
+      bleDevice.gatt.disconnect();
+      bleUpdateConnectedUI(false); return;
+    }
+
+    BLE_STATE.charTelemetry = await service.getCharacteristic(BLE_CHAR_TELEMETRY_UUID);
+    BLE_STATE.charStatus    = await service.getCharacteristic(BLE_CHAR_STATUS_UUID);
+    BLE_STATE.charConfig    = await service.getCharacteristic(BLE_CHAR_CONFIG_UUID);
+
+    try { BLE_STATE.charHeartbeat = await service.getCharacteristic(BLE_CHAR_HEARTBEAT_UUID); }
+    catch (_) { BLE_STATE.charHeartbeat = null; }
+
+    try { BLE_STATE.charWifiLog = await service.getCharacteristic(BLE_CHAR_WIFILOG_UUID); }
+    catch (_) { BLE_STATE.charWifiLog = null; console.warn('[BLE] WiFi log no disponible'); }
+
+    await BLE_STATE.charTelemetry.startNotifications();
+    BLE_STATE.charTelemetry.addEventListener('characteristicvaluechanged',
+      ev => bleHandleTelemetry(ev.target.value));
+
+    if (BLE_STATE.charWifiLog) {
+      try {
+        await BLE_STATE.charWifiLog.startNotifications();
+        BLE_STATE.charWifiLog.addEventListener('characteristicvaluechanged',
+          ev => bleHandleWifiLog(ev.target.value));
+      } catch (_) { }
+    }
+
+    if (BLE_STATE.charHeartbeat) {
+      try {
+        await BLE_STATE.charHeartbeat.startNotifications();
+        BLE_STATE.charHeartbeat.addEventListener('characteristicvaluechanged',
+          ev => bleHandleHeartbeat(ev.target.value));
+      } catch (_) { }
+    }
+
+    bleUpdateConnectedUI(true);
+    bleMarkHeartbeat('BLE');
+    bleStartRuntimeMonitors();
+    bleSetStatusMsg(`✅ Conectado a ${deviceName || 'AgroSensor'}.`, 'ok');
+
+    await bleReadHeartbeat();
+    await bleReadTelemetry();
+    await bleReadStatus();
+    await bleReadWifiLog();
+    await bleFetchHttpStatus();
+
+    if (BLE_STATE.statusPollTimer) clearInterval(BLE_STATE.statusPollTimer);
+    BLE_STATE.statusPollTimer = setInterval(() => {
+      if (BLE_STATE.connected) {
+        bleReadHeartbeat(); bleReadStatus(); bleReadWifiLog(); bleFetchHttpStatus();
+      }
+    }, 10000);
+
+  } catch (connErr) {
+    console.error('[BLE] Error GATT:', connErr);
+    bleSetStatusMsg(`❌ Error: ${connErr.message || connErr}`, 'err');
+    bleUpdateConnectedUI(false);
+  }
+}
+
+// ── Setup de UI ───────────────────────────────────────────────────────────────
+
+function setupBleUI() {
+  if (!bleSupported()) {
+    bleSetStatusMsg('Tu navegador no soporta Web Bluetooth. Usa Chrome o Edge. No disponible en iOS Safari.', 'err');
+    const btn = document.getElementById('ble-connect-btn');
+    if (btn) btn.disabled = true;
+    return;
+  }
+  document.getElementById('ble-connect-btn')?.addEventListener('click',   () => bleConnect());
+  document.getElementById('ble-disconnect-btn')?.addEventListener('click', () => bleDisconnect());
+  document.getElementById('ble-refresh-btn')?.addEventListener('click', () => {
+    bleReadTelemetry(); bleReadStatus(); bleReadWifiLog();
+  });
+  document.getElementById('ble-cfg-save')?.addEventListener('click', () => bleSaveInterval());
   bleUpdateConnectedUI(false);
 }
 // ─────────────────────────────────────────────────────────────
