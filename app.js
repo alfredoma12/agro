@@ -35,14 +35,14 @@ const PLANT_PRESETS = {
     tierra: [5, 15]
   },
   ruda_templada: {
-    label: '🌿 Ruda (clima templado)',
+    label: '🌿 Ruda',
     tempLabel: 'Templada (10°C – 25°C)',
     temp:   [10, 25],
     aire:   [30, 50],
     tierra: [20, 40]
   },
-  ruda_calida: {
-    label: '🌿 Ruda (clima cálido)',
+  Filodendro: {
+    label: '🌿 Filodendro',
     tempLabel: 'Cálida (18°C – 25°C)',
     temp:   [18, 25],
     aire:   [30, 50],
@@ -1669,6 +1669,13 @@ const BLE_CHAR_TELEMETRY_UUID  = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // READ
 const BLE_CHAR_STATUS_UUID     = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // READ
 const BLE_CHAR_CONFIG_UUID     = '6e400004-b5a3-f393-e0a9-e50e24dcca9e'; // WRITE
 const BLE_CHAR_WIFILOG_UUID    = '6e400005-b5a3-f393-e0a9-e50e24dcca9e'; // READ + NOTIFY
+const BLE_CHAR_HEARTBEAT_UUID  = '6e400006-b5a3-f393-e0a9-e50e24dcca9e'; // v2.3 READ + NOTIFY (opcional)
+
+const BLE_HTTP_STATUS_PATH     = '/ble-status';
+const BLE_HEARTBEAT_STALE_MS   = 15000;
+const BLE_HTTP_POLL_MS         = 10000;
+const BLE_WIFI_LOG_MAX_LINES   = 80;
+const BLE_HTTP_BASE_STORAGE_KEY = 'agrosensor-ble-http-base';
 
 const BLE_STATE = {
   device: null,
@@ -1677,8 +1684,13 @@ const BLE_STATE = {
   charStatus: null,
   charConfig: null,
   charWifiLog: null,
+  charHeartbeat: null,
   connected: false,
-  statusPollTimer: null
+  statusPollTimer: null,
+  heartbeatWatchTimer: null,
+  httpPollTimer: null,
+  lastHeartbeatAt: null,
+  espHttpBaseUrl: loadBleHttpBaseUrl()
 };
 
 function bleSupported() {
@@ -1695,6 +1707,138 @@ function bleValueToString(dataValue) {
   }
 }
 
+function bleParseJsonValue(dataValue, fallback = null) {
+  const raw = typeof dataValue === 'string' ? dataValue : bleValueToString(dataValue);
+  if (!raw) return fallback;
+  try { return JSON.parse(raw); } catch (_) { return fallback; }
+}
+
+function loadBleHttpBaseUrl() {
+  try { return localStorage.getItem(BLE_HTTP_BASE_STORAGE_KEY) || ''; } catch (_) { return ''; }
+}
+
+function saveBleHttpBaseUrl(url) {
+  try {
+    if (url) localStorage.setItem(BLE_HTTP_BASE_STORAGE_KEY, url);
+  } catch (_) {}
+}
+
+function bleCandidateHttpBaseFromStatus(data) {
+  if (!data || typeof data !== 'object') return '';
+  const rawUrl = data.ble_status_url || data.http_url || data.status_url || data.web_url || '';
+  if (/^https?:\/\//i.test(String(rawUrl))) {
+    try {
+      const url = new URL(rawUrl);
+      return `${url.protocol}//${url.host}`;
+    } catch (_) {}
+  }
+
+  const ip = data.ip || data.local_ip || data.wifi_ip || data.sta_ip || data.ipv4 || data.address;
+  if (!ip || !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(String(ip))) return '';
+  const port = data.http_port || data.web_port || 80;
+  return `http://${ip}${Number(port) && Number(port) !== 80 ? `:${port}` : ''}`;
+}
+
+function bleRememberHttpBaseUrl(data) {
+  const baseUrl = bleCandidateHttpBaseFromStatus(data);
+  if (!baseUrl || BLE_STATE.espHttpBaseUrl === baseUrl) return;
+  BLE_STATE.espHttpBaseUrl = baseUrl;
+  saveBleHttpBaseUrl(baseUrl);
+}
+
+function bleMarkHeartbeat(source = 'BLE', payload = null) {
+  BLE_STATE.lastHeartbeatAt = Date.now();
+
+  const hb = document.getElementById('ble-heartbeat');
+  if (hb) hb.style.display = 'inline-flex';
+
+  const pulse = document.getElementById('ble-hb-pulse');
+  if (pulse) {
+    pulse.classList.remove('active');
+    void pulse.offsetWidth;
+    pulse.classList.add('active');
+  }
+
+  const tsText = new Date(BLE_STATE.lastHeartbeatAt).toLocaleTimeString('es-CL', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+  const suffix = payload && typeof payload === 'object' && payload.uptime_s != null
+    ? ` · uptime ${Math.round(Number(payload.uptime_s))}s`
+    : '';
+  setTextIfExists('ble-hb-ts', `Heartbeat ${source}: ${tsText}${suffix}`);
+}
+
+function bleCheckHeartbeatFreshness() {
+  if (!BLE_STATE.connected || !BLE_STATE.lastHeartbeatAt) return;
+  const ageMs = Date.now() - BLE_STATE.lastHeartbeatAt;
+  const dot = document.getElementById('ble-dot');
+  const sideDot = document.getElementById('ble-sidebar-dot');
+
+  if (ageMs > BLE_HEARTBEAT_STALE_MS) {
+    if (dot) dot.className = 'status-dot warn';
+    if (sideDot) sideDot.className = 'status-dot warn';
+    bleSetStatusMsg(`Sin heartbeat hace ${Math.round(ageMs / 1000)}s. Revisando enlace BLE...`, 'info');
+  } else {
+    if (dot) dot.className = 'status-dot online';
+    if (sideDot) sideDot.className = 'status-dot online';
+  }
+}
+
+function bleStartRuntimeMonitors() {
+  bleStopRuntimeMonitors();
+  BLE_STATE.heartbeatWatchTimer = setInterval(bleCheckHeartbeatFreshness, 3000);
+  BLE_STATE.httpPollTimer = setInterval(() => {
+    if (BLE_STATE.connected) bleFetchHttpStatus();
+  }, BLE_HTTP_POLL_MS);
+}
+
+function bleStopRuntimeMonitors() {
+  if (BLE_STATE.heartbeatWatchTimer) {
+    clearInterval(BLE_STATE.heartbeatWatchTimer);
+    BLE_STATE.heartbeatWatchTimer = null;
+  }
+  if (BLE_STATE.httpPollTimer) {
+    clearInterval(BLE_STATE.httpPollTimer);
+    BLE_STATE.httpPollTimer = null;
+  }
+}
+
+async function bleFetchHttpStatus() {
+  if (!BLE_STATE.espHttpBaseUrl) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2500);
+  try {
+    const response = await fetch(`${BLE_STATE.espHttpBaseUrl}${BLE_HTTP_STATUS_PATH}`, {
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    bleApplyHttpStatus(data);
+    return data;
+  } catch (e) {
+    console.warn('No se pudo consultar /ble-status del ESP32:', e);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function bleApplyHttpStatus(data) {
+  if (!data || typeof data !== 'object') return;
+  bleRememberHttpBaseUrl(data);
+  bleMarkHeartbeat('HTTP', data);
+
+  const normalized = {
+    ...data,
+    wifi_state: data.wifi_state || data.wifi || data.wifiStatus,
+    mqtt_connected: data.mqtt_connected ?? data.mqtt ?? data.mqttConnected,
+    intervalo_ms: data.intervalo_ms ?? data.interval_ms,
+    intervalo_s: data.intervalo_s ?? data.interval_s
+  };
+  bleRenderStatus(normalized);
+}
+
 function bleSetStatusMsg(msg, kind = 'info') {
   const el = document.getElementById('ble-conn-status');
   if (!el) return;
@@ -1705,18 +1849,24 @@ function bleSetStatusMsg(msg, kind = 'info') {
 
 function bleUpdateConnectedUI(connected) {
   BLE_STATE.connected = connected;
+  if (!connected) BLE_STATE.lastHeartbeatAt = null;
 
   const dot       = document.getElementById('ble-dot');
   const dotText   = document.getElementById('ble-dot-text');
   const connectBtn= document.getElementById('ble-connect-btn');
   const disconnectBtn = document.getElementById('ble-disconnect-btn');
   const panels    = document.getElementById('ble-data-panels');
+  const heartbeat = document.getElementById('ble-heartbeat');
+  const deviceName = document.getElementById('ble-device-name');
 
   if (dot)     dot.className = `status-dot ${connected ? 'online' : 'offline'}`;
   if (dotText) dotText.textContent = connected ? 'Conectado' : 'Desconectado';
   if (connectBtn)    connectBtn.style.display    = connected ? 'none' : 'inline-flex';
   if (disconnectBtn) disconnectBtn.style.display = connected ? 'inline-flex' : 'none';
   if (panels)        panels.style.display        = connected ? 'block' : 'none';
+  if (heartbeat)     heartbeat.style.display     = connected ? 'inline-flex' : 'none';
+  if (deviceName)    deviceName.textContent      = connected && BLE_STATE.device ? (BLE_STATE.device.name || 'AgroSensor') : '';
+  if (!connected)    setTextIfExists('ble-hb-ts', '--');
 
   // Reflejar también en el badge de la sidebar (estado BLE rápido)
   const sideDot = document.getElementById('ble-sidebar-dot');
@@ -1751,6 +1901,13 @@ async function bleConnect() {
     BLE_STATE.charConfig    = await service.getCharacteristic(BLE_CHAR_CONFIG_UUID);
 
     try {
+      BLE_STATE.charHeartbeat = await service.getCharacteristic(BLE_CHAR_HEARTBEAT_UUID);
+    } catch (e) {
+      BLE_STATE.charHeartbeat = null;
+      console.warn('Característica de heartbeat BLE no disponible:', e);
+    }
+
+    try {
       BLE_STATE.charWifiLog = await service.getCharacteristic(BLE_CHAR_WIFILOG_UUID);
     } catch (e) {
       BLE_STATE.charWifiLog = null; // firmware antiguo sin esta característica
@@ -1775,20 +1932,37 @@ async function bleConnect() {
       }
     }
 
+    if (BLE_STATE.charHeartbeat) {
+      try {
+        await BLE_STATE.charHeartbeat.startNotifications();
+        BLE_STATE.charHeartbeat.addEventListener('characteristicvaluechanged', (ev) => {
+          bleHandleHeartbeat(ev.target.value);
+        });
+      } catch (e) {
+        console.warn('No se pudieron activar notificaciones de heartbeat BLE:', e);
+      }
+    }
+
     bleUpdateConnectedUI(true);
+    bleMarkHeartbeat('BLE');
+    bleStartRuntimeMonitors();
     bleSetStatusMsg(`✅ Conectado a ${bleDevice.name || 'AgroSensor'}.`, 'ok');
 
     // Primera lectura inmediata
+    await bleReadHeartbeat();
     await bleReadTelemetry();
     await bleReadStatus();
     await bleReadWifiLog();
+    await bleFetchHttpStatus();
 
     // Poll periódico de estado + log (la telemetría llega vía notify)
     if (BLE_STATE.statusPollTimer) clearInterval(BLE_STATE.statusPollTimer);
     BLE_STATE.statusPollTimer = setInterval(() => {
       if (BLE_STATE.connected) {
+        bleReadHeartbeat();
         bleReadStatus();
         bleReadWifiLog();
+        bleFetchHttpStatus();
       }
     }, 10000);
 
@@ -1804,6 +1978,7 @@ async function bleConnect() {
 }
 
 function onBleDisconnected() {
+  bleStopRuntimeMonitors();
   bleUpdateConnectedUI(false);
   bleSetStatusMsg('🔌 Dispositivo desconectado.', 'info');
   if (BLE_STATE.statusPollTimer) {

@@ -2,67 +2,97 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AgroSensor">
-<meta name="theme-color" content="#2d6a4f">
+<meta name="theme-color" content="#1a3a2a">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>AgroSensor · Monitor de Campo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-/* ── TOKENS ─────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════
+   TOKENS & RESET
+═══════════════════════════════════════════════ */
 :root {
-  --soil:       #3d2b1f;
-  --soil-light: #4f3a2c;
-  --leaf:       #2d6a4f;
-  --leaf-mid:   #40916c;
-  --leaf-light: #74c69d;
-  --sky:        #90e0ef;
-  --sun:        #e9c46a;
-  --sun-deep:   #f4a261;
-  --cream:      #faf8f4;
-  --parchment:  #f0ebe1;
-  --border:     #ddd5c8;
-  --muted:      #8a7e72;
-  --text:       #1e1b18;
-  --text-soft:  #5c5248;
-  --error:      #c0392b;
-  --error-bg:   #fdf2f0;
-  --warn:       #b9770e;
-  --warn-bg:    #fdf3e3;
-  --success:    #1b7a50;
-  --success-bg: #edfaf3;
-  --sidebar-w:  230px;
-  --radius:     14px;
-  --shadow:     0 2px 12px rgba(61,43,31,0.10);
-  --shadow-lg:  0 8px 32px rgba(61,43,31,0.13);
+  /* Palette — campo nocturno con acento bioluminiscente */
+  --bg-deep:     #0f1a14;
+  --bg-mid:      #162011;  /* sidebar */
+  --bg-surface:  #1c2b1e;  /* cards */
+  --bg-raised:   #223225;  /* input / hover */
+  --border:      #2e4535;
+  --border-soft: #253c2b;
+
+  --leaf:        #4ade80;  /* acento primario */
+  --leaf-dim:    #22543d;
+  --leaf-glow:   rgba(74,222,128,0.15);
+  --sky:         #67e8f9;
+  --sun:         #fbbf24;
+  --soil:        #a16207;
+
+  --text:        #e8f5ec;
+  --text-mid:    #9bb89f;
+  --text-dim:    #5a7a60;
+  --muted:       #4a6650;
+
+  --error:       #f87171;
+  --error-bg:    rgba(248,113,113,0.10);
+  --warn:        #fbbf24;
+  --warn-bg:     rgba(251,191,36,0.10);
+  --success:     #4ade80;
+  --success-bg:  rgba(74,222,128,0.10);
+
+  --radius-sm:   8px;
+  --radius:      12px;
+  --radius-lg:   16px;
+  --sidebar-w:   220px;
+  --topbar-h:    56px;
+
+  --shadow:      0 2px 12px rgba(0,0,0,0.35);
+  --shadow-lg:   0 8px 32px rgba(0,0,0,0.50);
+  --glow:        0 0 18px rgba(74,222,128,0.18);
 }
 
-/* ── RESET ───────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'DM Sans', system-ui, sans-serif;
-  background: var(--parchment);
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg-deep);
   color: var(--text);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ── AUTH SCREEN ─────────────────────────────────────────── */
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--leaf-dim); }
+
+/* ═══════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════ */
+.mono { font-family: 'JetBrains Mono', monospace; }
+.text-leaf  { color: var(--leaf); }
+.text-dim   { color: var(--text-dim); }
+.text-mid   { color: var(--text-mid); }
+
+/* ═══════════════════════════════════════════════
+   AUTH SCREEN
+═══════════════════════════════════════════════ */
 #auth {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 420px;
 }
 
 .auth-aside {
-  background: var(--leaf);
-  padding: 48px 40px;
+  background: var(--bg-mid);
+  border-right: 1px solid var(--border);
+  padding: 52px 48px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -70,385 +100,604 @@ body {
   overflow: hidden;
 }
 
+/* Firma visual: cuadrícula de campo bioluminiscente */
 .auth-aside::before {
   content: '';
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(circle at 30% 70%, rgba(116,198,157,0.22) 0%, transparent 55%),
-    radial-gradient(circle at 80% 20%, rgba(45,106,79,0.40) 0%, transparent 50%);
+  background-image:
+    linear-gradient(var(--border-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-soft) 1px, transparent 1px);
+  background-size: 48px 48px;
+  opacity: 0.4;
+}
+.auth-aside::after {
+  content: '';
+  position: absolute;
+  bottom: -80px; left: -80px;
+  width: 380px; height: 380px;
+  background: radial-gradient(circle, rgba(74,222,128,0.12) 0%, transparent 65%);
+  pointer-events: none;
 }
 
 .auth-logo { position: relative; z-index: 1; }
-.auth-logo-icon { font-size: 36px; line-height: 1; display: block; margin-bottom: 12px; }
-.auth-logo-text { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -0.03em; }
-.auth-logo-sub { font-size: 14px; color: rgba(255,255,255,0.65); margin-top: 4px; }
+.auth-logo-icon { font-size: 40px; line-height: 1; display: block; margin-bottom: 16px; }
+.auth-logo-text {
+  font-size: 28px; font-weight: 700; color: var(--text);
+  letter-spacing: -0.04em;
+}
+.auth-logo-text span { color: var(--leaf); }
+.auth-logo-sub { font-size: 14px; color: var(--text-dim); margin-top: 6px; }
 
-.auth-stats { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 20px; }
-.auth-stat-label { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.10em; margin-bottom: 4px; }
-.auth-stat-val { font-size: 22px; font-weight: 700; color: #fff; }
+.auth-features { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 18px; }
+.auth-feature {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 16px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: rgba(22,32,17,0.6);
+  backdrop-filter: blur(6px);
+}
+.auth-feature-icon {
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  background: var(--leaf-glow); border: 1px solid rgba(74,222,128,0.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+}
+.auth-feature-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.auth-feature-desc  { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
 
-.auth-panel { background: var(--cream); display: flex; align-items: center; justify-content: center; padding: 48px 40px; }
-.auth-box { width: 100%; max-width: 400px; }
-.auth-box-title { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
-.auth-box-sub { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+.auth-panel {
+  background: var(--bg-deep);
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px 36px;
+}
+.auth-box { width: 100%; max-width: 360px; }
+.auth-box-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 4px; letter-spacing: -0.02em; }
+.auth-box-sub { font-size: 13px; color: var(--text-dim); margin-bottom: 28px; }
 
 /* Tabs */
-.tab-bar { display: flex; gap: 4px; background: var(--parchment); border: 1px solid var(--border); border-radius: 10px; padding: 4px; margin-bottom: 28px; }
-.tab-btn { flex: 1; padding: 9px 12px; border: none; border-radius: 8px; background: transparent; font-family: inherit; font-size: 14px; font-weight: 500; color: var(--muted); cursor: pointer; transition: background 0.18s, color 0.18s; }
-.tab-btn.active { background: #fff; color: var(--leaf); font-weight: 700; box-shadow: 0 1px 4px rgba(61,43,31,0.10); }
-.tab-btn:hover:not(.active) { color: var(--text); }
-
-/* Form */
-.form-content { display: none; }
-.form-content.active { display: block; }
-.form-group { margin-bottom: 16px; }
-.form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-soft); margin-bottom: 6px; }
-.form-group input, .form-group select {
-  width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: var(--radius);
-  font-family: inherit; font-size: 14px; background: #fff; color: var(--text);
-  transition: border-color 0.2s, box-shadow 0.2s;
+.tab-bar {
+  display: flex; gap: 2px; background: var(--bg-surface);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 3px; margin-bottom: 24px;
 }
-.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--leaf-mid); box-shadow: 0 0 0 3px rgba(64,145,108,0.15); }
-.form-group input.error { border-color: var(--error); background: var(--error-bg); }
-.form-hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
-
-.error-msg { font-size: 12px; color: var(--error); margin-top: 6px; display: none; }
-.error-msg.show { display: block; }
-
-.success-box { background: var(--success-bg); border: 1px solid rgba(27,122,80,0.25); color: var(--success); padding: 14px; border-radius: var(--radius); font-size: 14px; margin-bottom: 16px; display: none; }
-.success-box.show { display: block; }
-
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 12px 18px; border: none; border-radius: var(--radius); font-family: inherit;
-  font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
-}
-.btn-primary { width: 100%; background: var(--leaf); color: #fff; }
-.btn-primary:hover { background: var(--leaf-mid); transform: translateY(-1px); box-shadow: var(--shadow); }
-.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
-.btn-secondary { background: var(--parchment); color: var(--text-soft); border: 1px solid var(--border); font-size: 13px; }
-.btn-secondary:hover { background: var(--border); }
-.btn-danger { background: #fff; color: var(--error); border: 1px solid #e8c4c0; font-size: 13px; }
-.btn-danger:hover { background: var(--error-bg); }
-
-.spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.65s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── DASHBOARD LAYOUT ────────────────────────────────────── */
-#dash { display: none; min-height: 100vh; animation: fadeIn 0.35s ease; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
-
-.dash-layout { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
-
-/* SIDEBAR */
-.sidebar { background: var(--soil); display: flex; flex-direction: column; padding: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
-
-.sidebar-brand { padding: 28px 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 10px; }
-.sidebar-icon { font-size: 28px; line-height: 1; }
-.sidebar-name { font-size: 17px; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
-.sidebar-sub { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
-
-.sidebar-section { padding: 20px 20px 8px; font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.12em; }
-
-.sidebar-device { margin: 0 12px 4px; background: rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; }
-.sidebar-device-label { font-size: 10px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.10em; }
-.sidebar-device-name { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--leaf-light); margin-top: 3px; word-break: break-all; }
-
-.sidebar-status { margin: 8px 12px 0; display: flex; align-items: center; gap: 7px; font-size: 13px; color: rgba(255,255,255,0.55); }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.status-dot.online { background: var(--leaf-light); box-shadow: 0 0 0 3px rgba(116,198,157,0.25); }
-.status-dot.offline { background: #e74c3c; }
-
-/* Nav menu */
-.nav-menu { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; }
-.nav-item {
-  display: flex; align-items: center; gap: 11px;
-  padding: 11px 12px; border-radius: 10px;
-  color: rgba(255,255,255,0.62);
-  font-size: 14px; font-weight: 500;
-  cursor: pointer; border: none; background: transparent;
-  width: 100%; text-align: left; font-family: inherit;
+.tab-btn {
+  flex: 1; padding: 8px 10px; border: none; border-radius: 6px;
+  background: transparent; font-family: inherit; font-size: 13px;
+  font-weight: 500; color: var(--text-dim); cursor: pointer;
   transition: background 0.16s, color 0.16s;
 }
-.nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
-.nav-item.active { background: var(--leaf); color: #fff; }
-.nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+.tab-btn.active { background: var(--bg-raised); color: var(--leaf); font-weight: 600; }
+.tab-btn:hover:not(.active) { color: var(--text-mid); }
 
-.nav-sub { display: flex; flex-direction: column; gap: 2px; padding: 2px 0 4px 31px; }
+.form-content { display: none; }
+.form-content.active { display: block; animation: fadeIn 0.2s ease; }
+
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-mid); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+.form-group input {
+  width: 100%; padding: 11px 14px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-surface); color: var(--text);
+  font-family: inherit; font-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-group input::placeholder { color: var(--muted); }
+.form-group input:focus { outline: none; border-color: var(--leaf); box-shadow: 0 0 0 3px var(--leaf-glow); }
+.form-group input.error { border-color: var(--error); }
+
+.error-msg { font-size: 12px; color: var(--error); margin-top: 5px; display: none; }
+.error-msg.show { display: block; }
+.success-box {
+  background: var(--success-bg); border: 1px solid rgba(74,222,128,0.25);
+  color: var(--success); padding: 12px 14px; border-radius: var(--radius-sm);
+  font-size: 13px; margin-bottom: 14px; display: none;
+}
+.success-box.show { display: block; }
+.form-hint { font-size: 12px; color: var(--text-dim); margin-top: 5px; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 11px 18px; border: none; border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  text-decoration: none;
+}
+.btn-primary {
+  width: 100%; background: var(--leaf); color: #0a1a0e;
+  box-shadow: 0 0 0 0 var(--leaf-glow);
+}
+.btn-primary:hover { background: #6ee7a0; box-shadow: var(--glow); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-secondary {
+  background: var(--bg-raised); color: var(--text-mid);
+  border: 1px solid var(--border); font-size: 13px;
+}
+.btn-secondary:hover { background: var(--border); color: var(--text); }
+.btn-danger { background: transparent; color: var(--error); border: 1px solid rgba(248,113,113,0.30); font-size: 13px; }
+.btn-danger:hover { background: var(--error-bg); }
+.btn-icon { padding: 9px; width: 36px; height: 36px; }
+
+.spinner { width: 13px; height: 13px; border: 2px solid rgba(10,26,14,0.3); border-top-color: #0a1a0e; border-radius: 50%; animation: spin 0.65s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════════════════
+   DASHBOARD LAYOUT
+═══════════════════════════════════════════════ */
+#dash { display: none; min-height: 100vh; animation: fadeIn 0.3s ease; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+
+.dash-layout { display: flex; min-height: 100vh; }
+
+/* ═══════════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════════ */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--bg-mid);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100vh;
+  overflow-y: auto; flex-shrink: 0;
+  z-index: 100;
+}
+
+.sidebar-brand {
+  padding: 22px 16px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.sidebar-brand-icon { font-size: 26px; line-height: 1; }
+.sidebar-brand-name { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+.sidebar-brand-name span { color: var(--leaf); }
+.sidebar-brand-version { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+
+.sidebar-device {
+  margin: 14px 12px 4px;
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+}
+.sidebar-device-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.10em; margin-bottom: 4px; }
+.sidebar-device-id { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--leaf); word-break: break-all; }
+
+.sidebar-status {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 12px 14px; font-size: 12px; color: var(--text-dim);
+}
+
+/* Nav */
+.nav-section { padding: 16px 12px 4px; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; }
+.nav-menu { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 10px; border-radius: var(--radius-sm);
+  color: var(--text-dim); font-size: 13px; font-weight: 500;
+  cursor: pointer; border: none; background: transparent;
+  width: 100%; text-align: left; font-family: inherit;
+  transition: background 0.14s, color 0.14s;
+  position: relative;
+}
+.nav-item:hover { background: var(--bg-raised); color: var(--text-mid); }
+.nav-item.active { background: var(--leaf-glow); color: var(--leaf); font-weight: 600; border: 1px solid rgba(74,222,128,0.15); }
+.nav-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto; font-size: 10px; font-weight: 700;
+  background: var(--leaf-glow); color: var(--leaf);
+  border-radius: 99px; padding: 1px 7px;
+  border: 1px solid rgba(74,222,128,0.25);
+}
+
+.nav-sub { display: flex; flex-direction: column; gap: 1px; padding: 2px 0 6px 28px; }
 .nav-sub.collapsed { display: none; }
 .nav-sub-item {
-  padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500;
-  color: rgba(255,255,255,0.45); cursor: pointer; border: none; background: transparent;
-  text-align: left; font-family: inherit; width: 100%; transition: background 0.16s, color 0.16s;
+  padding: 7px 10px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 500;
+  color: var(--muted); cursor: pointer; border: none; background: transparent;
+  text-align: left; font-family: inherit; width: 100%; transition: all 0.14s;
 }
-.nav-sub-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
-.nav-sub-item.active { color: var(--leaf-light); font-weight: 700; }
+.nav-sub-item:hover { color: var(--text-mid); background: var(--bg-raised); }
+.nav-sub-item.active { color: var(--leaf); font-weight: 600; }
 
-.sidebar-bottom { margin-top: auto; padding: 16px 12px; border-top: 1px solid rgba(255,255,255,0.08); }
+.sidebar-bottom { margin-top: auto; padding: 12px 8px; border-top: 1px solid var(--border); }
 
-/* MAIN */
-.main { padding: 32px 36px; overflow-y: auto; }
+/* Status dot */
+.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.status-dot.online  { background: var(--leaf); box-shadow: 0 0 0 3px rgba(74,222,128,0.20); animation: pulse-dot 2.5s ease-in-out infinite; }
+.status-dot.offline { background: var(--error); }
+.status-dot.warn    { background: var(--warn); }
 
-.main-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 14px; }
-.main-title { font-size: 20px; font-weight: 700; color: var(--text); }
-.main-meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
-.topbar-actions { display: flex; gap: 10px; align-items: center; }
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(74,222,128,0.25); }
+  50% { box-shadow: 0 0 0 5px rgba(74,222,128,0.10); }
+}
+
+/* ═══════════════════════════════════════════════
+   MAIN CONTENT
+═══════════════════════════════════════════════ */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.main-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; height: var(--topbar-h);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-mid); position: sticky; top: 0; z-index: 90;
+  gap: 14px;
+}
+.topbar-title { font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+.topbar-meta { font-size: 12px; color: var(--text-dim); }
+.topbar-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+.main-body { padding: 24px 28px; flex: 1; overflow-y: auto; }
 
 /* View visibility */
 .view { display: none; }
-.view.active { display: block; animation: fadeIn 0.25s ease; }
+.view.active { display: block; animation: fadeIn 0.2s ease; }
 
-/* KPI row */
-.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
-.kpi { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
-.kpi-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.10em; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
-.kpi-value { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; font-feature-settings: "tnum"; }
-.kpi-sub { font-size: 12px; color: var(--muted); margin-top: 5px; }
+/* ═══════════════════════════════════════════════
+   STATUS BADGE
+═══════════════════════════════════════════════ */
+.status-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 11px; border-radius: 99px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+}
+.status-online  { background: rgba(74,222,128,0.12); color: var(--leaf); border: 1px solid rgba(74,222,128,0.25); }
+.status-offline { background: rgba(248,113,113,0.10); color: var(--error); border: 1px solid rgba(248,113,113,0.25); }
+.status-warn    { background: rgba(251,191,36,0.10);  color: var(--warn);  border: 1px solid rgba(251,191,36,0.25); }
 
-/* Section headers */
-.section-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
-.section-title { font-size: 15px; font-weight: 700; color: var(--text); }
-
-/* ── ALERTS ──────────────────────────────────────────────── */
-#alerts-container { display: none; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+/* ═══════════════════════════════════════════════
+   ALERTS
+═══════════════════════════════════════════════ */
+#alerts-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
 .alert-banner {
   display: flex; align-items: flex-start; gap: 12px;
-  padding: 14px 16px; border-radius: var(--radius);
-  font-size: 13.5px; line-height: 1.5; box-shadow: var(--shadow);
-  border: 1px solid transparent;
+  padding: 13px 16px; border-radius: var(--radius-sm);
+  font-size: 13px; line-height: 1.5; border: 1px solid transparent;
+  animation: slideDown 0.2s ease;
 }
-.alert-banner .alert-icon { font-size: 20px; line-height: 1.3; flex-shrink: 0; }
-.alert-banner .alert-text { color: var(--text); }
-.alert-warn     { background: var(--warn-bg);  border-color: rgba(185,119,14,0.25); }
+@keyframes slideDown { from { transform: translateY(-6px); opacity: 0; } to { opacity: 1; } }
+.alert-banner .alert-icon { font-size: 18px; line-height: 1.3; flex-shrink: 0; }
+.alert-warn     { background: var(--warn-bg);  border-color: rgba(251,191,36,0.25); }
 .alert-warn .alert-text     { color: var(--warn); }
-.alert-critical { background: var(--error-bg); border-color: rgba(192,57,43,0.25); }
+.alert-critical { background: var(--error-bg); border-color: rgba(248,113,113,0.25); }
 .alert-critical .alert-text { color: var(--error); }
 
-/* Readings grid */
-#grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-bottom: 28px; }
+/* ═══════════════════════════════════════════════
+   KPI ROW
+═══════════════════════════════════════════════ */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.kpi {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 16px; box-shadow: var(--shadow);
+}
+.kpi-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+.kpi-value { font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; font-family: 'JetBrains Mono', monospace; }
+.kpi-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+/* ═══════════════════════════════════════════════
+   READINGS GRID
+═══════════════════════════════════════════════ */
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.section-title { font-size: 13px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: 0.08em; }
+
+#grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
 .reading-card {
-  background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 18px 18px 16px; box-shadow: var(--shadow);
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 16px 14px;
   position: relative; overflow: hidden;
+  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
 }
-.reading-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: var(--radius) 0 0 var(--radius); }
-.reading-card.temp::before  { background: var(--sun-deep); }
-.reading-card.aire::before  { background: var(--sky); }
-.reading-card.tierra::before { background: var(--leaf-mid); }
-.reading-card.other::before  { background: var(--border); }
-.reading-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: var(--leaf-light); }
-.reading-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 8px; }
-.reading-value { font-size: 28px; font-weight: 700; color: var(--text); font-feature-settings: "tnum"; line-height: 1; }
+.reading-card::after {
+  content: ''; position: absolute;
+  bottom: 0; left: 0; right: 0; height: 3px;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+.reading-card.temp::after  { background: linear-gradient(90deg, var(--sun), #f97316); }
+.reading-card.aire::after  { background: linear-gradient(90deg, var(--sky), #38bdf8); }
+.reading-card.tierra::after { background: linear-gradient(90deg, var(--leaf), #16a34a); }
+.reading-card.other::after  { background: var(--border); }
+.reading-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: var(--leaf); }
+.reading-label { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 10px; }
+.reading-value { font-size: 30px; font-weight: 700; color: var(--text); font-family: 'JetBrains Mono', monospace; line-height: 1; }
+.reading-emoji { position: absolute; top: 14px; right: 14px; font-size: 20px; opacity: 0.25; }
 
-/* Chart card */
-.chart-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow); margin-bottom: 28px; }
-.chart-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
-.chart-title { font-size: 15px; font-weight: 700; color: var(--text); }
+/* ═══════════════════════════════════════════════
+   CARD GENERIC
+═══════════════════════════════════════════════ */
+.card {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px;
+}
+.card-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.card-desc { font-size: 12px; color: var(--text-dim); margin-bottom: 16px; line-height: 1.5; }
+
+/* ═══════════════════════════════════════════════
+   CHART
+═══════════════════════════════════════════════ */
 .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; }
-.legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
-.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
-.chart-range-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+.chart-range-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
 .range-btn {
-  padding: 7px 14px; border: 1.5px solid var(--border); border-radius: 999px;
-  background: var(--cream); color: var(--text-soft); font-family: inherit;
-  font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s;
+  padding: 6px 14px; border: 1px solid var(--border); border-radius: 99px;
+  background: transparent; color: var(--text-dim); font-family: inherit;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.14s;
 }
-.range-btn:hover { border-color: var(--leaf-light); }
-.range-btn.active { background: var(--leaf); color: #fff; border-color: var(--leaf); }
+.range-btn:hover { border-color: var(--leaf); color: var(--leaf); }
+.range-btn.active { background: var(--leaf); color: #0a1a0e; border-color: var(--leaf); }
 
-/* Chart canvas wrapper: fixed height avoids Chart.js collapse */
-.chart-wrap { position: relative; height: 280px; width: 100%; }
+.chart-wrap { position: relative; height: 260px; width: 100%; }
 #trend-chart { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
 
-/* History table card */
-.history-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow); margin-bottom: 28px; }
-.history-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--parchment); }
-.filter-select, .filter-input { padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: var(--cream); color: var(--text); }
-.filter-select:focus, .filter-input:focus { outline: none; border-color: var(--leaf-mid); }
-#history-source { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+/* ═══════════════════════════════════════════════
+   HISTORY TABLE
+═══════════════════════════════════════════════ */
+.history-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.filter-select, .filter-input {
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 13px; background: var(--bg-raised); color: var(--text);
+}
+.filter-select:focus, .filter-input:focus { outline: none; border-color: var(--leaf); }
+.filter-select option { background: var(--bg-surface); }
 
-.history-table-wrap { overflow: auto; max-height: 380px; border-radius: 8px; border: 1px solid var(--parchment); }
+.history-table-wrap { overflow: auto; max-height: 340px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
 #history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-#history-table thead { position: sticky; top: 0; background: var(--parchment); z-index: 2; }
-#history-table th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; border-bottom: 1px solid var(--border); }
-#history-table td { padding: 9px 14px; border-bottom: 1px solid var(--parchment); color: var(--text); font-feature-settings: "tnum"; }
-#history-table tbody tr:hover { background: #fdfaf7; }
+#history-table thead { position: sticky; top: 0; background: var(--bg-raised); z-index: 2; }
+#history-table th { padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; border-bottom: 1px solid var(--border); }
+#history-table td { padding: 9px 14px; border-bottom: 1px solid var(--bg-raised); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+#history-table tbody tr:hover { background: var(--bg-raised); }
 #history-table tbody tr:last-child td { border-bottom: none; }
 
-/* Status badge */
-.status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; }
-.status-online  { background: #edfaf3; color: var(--success); }
-.status-offline { background: var(--error-bg); color: var(--error); }
-
-/* Admin section separator */
-.admin-sep { border: 0; border-top: 1px solid var(--border); margin: 20px 0; }
-.admin-subtitle { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.10em; margin-bottom: 14px; }
-
-/* ── SETTINGS VIEW ───────────────────────────────────────── */
-.settings-tabs { display: flex; gap: 6px; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
-.settings-tab {
-  padding: 11px 18px; border: none; background: transparent; font-family: inherit;
-  font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer;
-  border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s;
-}
-.settings-tab.active { color: var(--leaf); border-bottom-color: var(--leaf); }
-.settings-tab:hover:not(.active) { color: var(--text); }
-
+/* ═══════════════════════════════════════════════
+   SETTINGS / CONFIG
+═══════════════════════════════════════════════ */
 .settings-panel { display: none; }
 .settings-panel.active { display: block; animation: fadeIn 0.2s ease; }
 
-.settings-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 22px; }
-.settings-card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
-.settings-card-desc { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
-
-.settings-row { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
-.settings-field { flex: 1; min-width: 180px; }
-.settings-field label { display: block; font-size: 13px; font-weight: 600; color: var(--text-soft); margin-bottom: 6px; }
+.settings-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.settings-field { flex: 1; min-width: 160px; }
+.settings-field label { display: block; font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
 .settings-field input, .settings-field select {
-  width: 100%; padding: 11px 13px; border: 1.5px solid var(--border); border-radius: 10px;
-  font-family: inherit; font-size: 14px; background: var(--cream); color: var(--text);
+  width: 100%; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 14px; background: var(--bg-raised); color: var(--text);
 }
-.settings-field input:focus, .settings-field select:focus { outline: none; border-color: var(--leaf-mid); }
+.settings-field input:focus, .settings-field select:focus { outline: none; border-color: var(--leaf); }
+.settings-field select option { background: var(--bg-surface); }
 
-.settings-status { font-size: 13px; margin-top: 14px; display: none; }
+.settings-status { font-size: 13px; margin-top: 12px; display: none; padding: 10px 12px; border-radius: var(--radius-sm); }
 .settings-status.show { display: block; }
-.settings-status.ok   { color: var(--success); }
-.settings-status.err  { color: var(--error); }
+.settings-status.ok  { background: var(--success-bg); color: var(--success); border: 1px solid rgba(74,222,128,0.20); }
+.settings-status.err { background: var(--error-bg);   color: var(--error);   border: 1px solid rgba(248,113,113,0.20); }
 
-/* Threshold grid */
-.threshold-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
-.threshold-item { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--cream); }
-.threshold-item-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; }
+/* Threshold / Plant profile */
+.threshold-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.threshold-item { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; background: var(--bg-raised); }
+.threshold-item-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; }
 .threshold-range { display: flex; gap: 8px; align-items: center; }
-.threshold-range input { width: 100%; padding: 9px 10px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-family: inherit; background: #fff; }
-.threshold-range span { color: var(--muted); font-size: 12px; }
+.threshold-range input { width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: 'JetBrains Mono', monospace; background: var(--bg-surface); color: var(--text); }
+.threshold-range span { color: var(--muted); font-size: 13px; flex-shrink: 0; }
 
-/* ── PLANT PROFILE PANEL ─────────────────────────────────── */
 .plant-info-box {
-  background: var(--cream); border: 1px solid var(--border); border-radius: 12px;
-  padding: 14px 16px; margin-top: 16px; font-size: 13.5px; color: var(--text-soft);
-  display: flex; flex-direction: column; gap: 6px;
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 14px 16px; margin-top: 14px;
+  font-size: 13px; color: var(--text-mid); display: flex; flex-direction: column; gap: 6px; line-height: 1.6;
 }
 .plant-info-row strong { color: var(--text); }
 
-/* Logs */
-.log-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+/* ═══════════════════════════════════════════════
+   LOGS CONSOLE
+═══════════════════════════════════════════════ */
+.log-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 .log-console {
-  background: var(--soil); border-radius: 12px; padding: 16px;
-  font-family: 'DM Mono', monospace; font-size: 12.5px; line-height: 1.7;
-  color: #d8d0c4; max-height: 420px; overflow-y: auto;
+  background: var(--bg-deep); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 14px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7;
+  color: var(--text-mid); max-height: 380px; overflow-y: auto;
 }
 .log-line { display: flex; gap: 10px; padding: 2px 0; white-space: pre-wrap; word-break: break-word; }
-.log-time { color: rgba(255,255,255,0.35); flex-shrink: 0; }
-.log-level { flex-shrink: 0; font-weight: 700; width: 56px; }
-.log-level.info  { color: var(--sky); }
-.log-level.warn  { color: var(--sun); }
-.log-level.error { color: #f08a8a; }
-.log-level.ok    { color: var(--leaf-light); }
-.log-msg { color: #ece6dc; }
+.log-msg { color: var(--text-mid); }
 .log-empty { color: var(--muted); text-align: center; padding: 30px; }
+.auto-scroll-toggle { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-dim); cursor: pointer; user-select: none; }
+.auto-scroll-toggle input { accent-color: var(--leaf); width: 14px; height: 14px; }
 
-.auto-scroll-toggle { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-soft); cursor: pointer; user-select: none; }
-.auto-scroll-toggle input { accent-color: var(--leaf); width: 16px; height: 16px; }
+/* Admin sep */
+.admin-sep { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+.admin-subtitle { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.10em; margin-bottom: 12px; }
 
-/* Bluetooth */
-.ble-status-line { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-soft); margin-bottom: 16px; }
-.ble-status-ok { color: var(--success); }
+/* ═══════════════════════════════════════════════
+   BLUETOOTH VIEW
+═══════════════════════════════════════════════ */
+.ble-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px; background: var(--bg-surface);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  margin-bottom: 14px;
+}
+.ble-dot-wrap { display: flex; align-items: center; gap: 8px; }
+.ble-device-name { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--leaf); }
+#ble-conn-status { font-size: 12px; color: var(--text-dim); margin-left: auto; }
+.ble-status-ok  { color: var(--success); }
 .ble-status-err { color: var(--error); }
-.ble-status-info { color: var(--muted); }
-.ble-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
-.ble-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 18px; }
-.ble-metric { background: var(--cream); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
-.ble-metric-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
-.ble-metric-value { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 700; color: var(--text); word-break: break-word; }
-.ble-status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-bottom: 18px; }
-.ble-status-item { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--parchment); border-radius: 10px; background: #fff; font-size: 13px; }
-.ble-status-item span:first-child { color: var(--muted); }
-.ble-status-item span:last-child { font-family: 'DM Mono', monospace; color: var(--text); text-align: right; word-break: break-word; }
+.ble-status-info { color: var(--text-dim); }
 
-/* ── PWA INSTALL MODAL ───────────────────────────────────── */
+.ble-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+
+/* BLE metrics grid */
+.ble-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.ble-metric {
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 13px 14px;
+}
+.ble-metric-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px; }
+.ble-metric-value { font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 700; color: var(--text); word-break: break-all; }
+.ble-metric-value.live { color: var(--leaf); }
+
+/* BLE status table */
+.ble-status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.ble-status-item {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 9px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--bg-raised); font-size: 12px;
+}
+.ble-status-item span:first-child { color: var(--text-dim); flex-shrink: 0; }
+.ble-status-item span:last-child  { font-family: 'JetBrains Mono', monospace; color: var(--text); text-align: right; word-break: break-all; }
+
+/* Heartbeat indicator */
+.ble-heartbeat {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+}
+.ble-heartbeat-pulse {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--leaf); opacity: 0;
+  transition: opacity 0.2s;
+}
+.ble-heartbeat-pulse.beat { animation: heartbeat 0.5s ease; }
+@keyframes heartbeat {
+  0%   { opacity: 1; transform: scale(1.4); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+/* BLE data panel (collapsed until connected) */
+#ble-data-panels { display: none; }
+
+/* ═══════════════════════════════════════════════
+   CONNECTION OVERLAY (BLE no disponible / offline)
+═══════════════════════════════════════════════ */
+.offline-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--error-bg); color: var(--error);
+  border: 1px solid rgba(248,113,113,0.25);
+  border-radius: 99px; padding: 4px 10px; font-size: 11px; font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════
+   PWA INSTALL MODAL
+═══════════════════════════════════════════════ */
 #pwa-install-modal {
   position: fixed; inset: 0; z-index: 1000;
   display: none; align-items: flex-end; justify-content: center;
-  background: rgba(30,27,24,0.45); padding: 16px;
+  background: rgba(0,0,0,0.60); padding: 16px;
 }
 #pwa-install-modal.show { display: flex; }
 .pwa-modal-card {
-  background: #fff; border-radius: 18px; padding: 22px 22px 18px;
-  width: 100%; max-width: 420px; box-shadow: var(--shadow-lg);
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 22px;
+  width: 100%; max-width: 400px; box-shadow: var(--shadow-lg);
   animation: pwaSlideUp 0.3s ease;
 }
-@keyframes pwaSlideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes pwaSlideUp { from { transform: translateY(40px); opacity: 0; } to { opacity: 1; } }
 .pwa-modal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.pwa-modal-icon { font-size: 32px; line-height: 1; }
-.pwa-modal-title { font-size: 16px; font-weight: 700; color: var(--text); }
-.pwa-modal-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
-.pwa-modal-body { font-size: 13.5px; color: var(--text-soft); line-height: 1.6; margin-bottom: 16px; }
+.pwa-modal-icon { font-size: 30px; line-height: 1; }
+.pwa-modal-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.pwa-modal-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.pwa-modal-body { font-size: 13px; color: var(--text-mid); line-height: 1.6; margin-bottom: 16px; }
 .pwa-modal-body ol { margin: 8px 0 0 18px; }
 .pwa-modal-body li { margin-bottom: 4px; }
-.pwa-modal-actions { display: flex; gap: 10px; }
+.pwa-modal-actions { display: flex; gap: 8px; }
 .pwa-modal-actions .btn { flex: 1; width: auto; }
 
-/* ── MOBILE ──────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════
+   RESPONSIVE — MOBILE
+═══════════════════════════════════════════════ */
 @media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+
   #auth { grid-template-columns: 1fr; }
   .auth-aside { display: none; }
 
-  .dash-layout { grid-template-columns: 1fr; }
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0;
+    width: 240px; transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 200;
+  }
+  .sidebar.open { transform: translateX(0); box-shadow: var(--shadow-lg); }
 
-  .sidebar { height: auto; position: static; padding: 0; }
-  .sidebar-brand { padding: 14px 16px; }
-  .sidebar-sub { display: none; }
-  .sidebar-section { padding: 14px 16px 6px; }
-  .sidebar-device { margin: 0 12px 8px; }
-  .nav-menu { padding: 8px; }
+  .sidebar-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55); z-index: 190;
+  }
+  .sidebar-overlay.show { display: block; }
 
-  .main { padding: 18px 16px; }
-  .main-topbar { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .main-topbar { padding: 0 16px; }
+  .main-body { padding: 16px; }
 
-  .kpi-row { grid-template-columns: 1fr 1fr; }
   #grid { grid-template-columns: 1fr 1fr; }
+  .kpi-row { grid-template-columns: 1fr 1fr; }
+  .topbar-title { display: none; }
+
+  /* Hamburger button */
+  .btn-hamburger {
+    display: flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: var(--radius-sm);
+    background: var(--bg-raised); border: 1px solid var(--border);
+    cursor: pointer; font-size: 16px; color: var(--text-mid);
+    transition: background 0.14s;
+  }
+  .btn-hamburger:hover { background: var(--border); }
 
   #history-table thead { display: none; }
   #history-table, #history-table tbody, #history-table tr, #history-table td { display: block; width: 100%; }
-  #history-table tr { margin-bottom: 10px; border-bottom: 2px solid var(--parchment); }
-  #history-table td { padding: 8px 10px; }
+  #history-table tr { margin-bottom: 10px; border-bottom: 1px solid var(--border); }
+  #history-table td { padding: 7px 10px; }
   #history-table td::before { content: attr(data-label); display: block; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 2px; }
 
   .settings-row { flex-direction: column; align-items: stretch; }
+  .ble-grid { grid-template-columns: 1fr 1fr; }
 }
 
-@media (max-width: 420px) {
-  .kpi-row { grid-template-columns: 1fr; }
+/* Hamburger hidden on desktop */
+.btn-hamburger { display: none; }
+@media (min-width: 769px) { .btn-hamburger { display: none !important; } }
+@media (max-width: 768px) { .btn-hamburger { display: flex; } }
+
+@media (max-width: 440px) {
   #grid { grid-template-columns: 1fr; }
+  .kpi-row { grid-template-columns: 1fr; }
+  .ble-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
 <body>
 
-<!-- ── AUTH ──────────────────────────────────────────────── -->
+<!-- Overlay para cerrar sidebar en mobile -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<!-- ══════════════════════════════════════════════════
+     AUTH
+══════════════════════════════════════════════════ -->
 <div id="auth">
   <aside class="auth-aside">
     <div class="auth-logo">
       <span class="auth-logo-icon">🌿</span>
-      <div class="auth-logo-text">AgroSensor</div>
-      <div class="auth-logo-sub">Monitoreo de campo en tiempo real</div>
+      <div class="auth-logo-text">Agro<span>Sensor</span></div>
+      <div class="auth-logo-sub">Monitoreo de campo en tiempo real · v2.3</div>
     </div>
-    <div class="auth-stats">
-      <div>
-        <div class="auth-stat-label">Variables monitoreadas</div>
-        <div class="auth-stat-val">Temperatura · Humedad aire · Humedad tierra</div>
+    <div class="auth-features">
+      <div class="auth-feature">
+        <div class="auth-feature-icon">📡</div>
+        <div>
+          <div class="auth-feature-title">MQTT + WiFi industrial</div>
+          <div class="auth-feature-desc">Telemetría persistente con reconexión automática y FSM robusta.</div>
+        </div>
       </div>
-      <div>
-        <div class="auth-stat-label">Actualización automática</div>
-        <div class="auth-stat-val">Configurable desde el panel</div>
+      <div class="auth-feature">
+        <div class="auth-feature-icon">🔵</div>
+        <div>
+          <div class="auth-feature-title">Canal BLE local</div>
+          <div class="auth-feature-desc">Accede al dispositivo directamente por Bluetooth sin necesitar internet.</div>
+        </div>
       </div>
-      <div>
-        <div class="auth-stat-label">Diagnóstico</div>
-        <div class="auth-stat-val">Logs del dispositivo en vivo</div>
+      <div class="auth-feature">
+        <div class="auth-feature-icon">🔔</div>
+        <div>
+          <div class="auth-feature-title">Alertas inteligentes</div>
+          <div class="auth-feature-desc">Notificaciones push cuando temperatura o humedad salen del rango ideal.</div>
+        </div>
       </div>
     </div>
   </aside>
@@ -459,20 +708,20 @@ body {
       <div class="auth-box-sub">Ingresa tus credenciales o registra un nuevo dispositivo.</div>
 
       <div class="tab-bar">
-        <button class="tab-btn active" onclick="showTab(event, 'login')">Ingresar</button>
-        <button class="tab-btn" onclick="showTab(event, 'register')">Registro</button>
-        <button class="tab-btn" onclick="showTab(event, 'admin-panel')">Admin</button>
+        <button class="tab-btn active" onclick="showTab(event,'login')">Ingresar</button>
+        <button class="tab-btn" onclick="showTab(event,'register')">Registro</button>
+        <button class="tab-btn" onclick="showTab(event,'admin-panel')">Admin</button>
       </div>
 
       <form id="login" class="form-content active" onsubmit="doLogin(event)">
         <div class="form-group">
           <label for="login-user">Usuario</label>
-          <input id="login-user" type="text" placeholder="Tu usuario" autocomplete="username" required>
+          <input id="login-user" type="text" placeholder="tu_usuario" autocomplete="username" required>
           <div class="error-msg"></div>
         </div>
         <div class="form-group">
           <label for="login-pass">Contraseña</label>
-          <input id="login-pass" type="password" placeholder="Tu contraseña" autocomplete="current-password" required>
+          <input id="login-pass" type="password" placeholder="••••••••" autocomplete="current-password" required>
           <div class="error-msg"></div>
         </div>
         <button type="submit" class="btn btn-primary" id="login-btn">Entrar</button>
@@ -491,7 +740,7 @@ body {
         </div>
         <div class="form-group">
           <label for="reg-device">ID del dispositivo</label>
-          <input id="reg-device" type="text" placeholder="Ej: ESP32_PLANTA_TALLER" required>
+          <input id="reg-device" type="text" placeholder="ESP32_PLANTA_TALLER" required>
           <div class="error-msg"></div>
         </div>
         <div class="form-group">
@@ -504,23 +753,21 @@ body {
 
       <form id="admin-panel" class="form-content" onsubmit="doAdminRegisterDevice(event)">
         <div class="form-group">
-          <label for="admin-master-key">Clave maestra de administrador</label>
-          <input id="admin-master-key" type="password" placeholder="Clave maestra" required>
+          <label for="admin-master-key">Clave maestra</label>
+          <input id="admin-master-key" type="password" placeholder="Clave de administrador" required>
           <div class="error-msg"></div>
         </div>
         <hr class="admin-sep">
-        <div class="admin-subtitle">Pre-registrar equipo nuevo</div>
-
+        <div class="admin-subtitle">Pre-registrar dispositivo nuevo</div>
         <div id="admin-success" class="success-box"></div>
-
         <div class="form-group">
-          <label for="admin-device-id">ID del nuevo dispositivo</label>
-          <input id="admin-device-id" type="text" placeholder="Ej: ESP32_PLANTA_TALLER">
+          <label for="admin-device-id">ID del dispositivo</label>
+          <input id="admin-device-id" type="text" placeholder="ESP32_PLANTA_TALLER">
           <div class="error-msg"></div>
         </div>
         <div class="form-group">
           <label for="admin-device-token">Token de activación</label>
-          <input id="admin-device-token" type="text" placeholder="Genera un token seguro">
+          <input id="admin-device-token" type="text" placeholder="Token seguro único">
           <div class="error-msg"></div>
         </div>
         <button type="submit" class="btn btn-primary" id="admin-btn">Registrar dispositivo</button>
@@ -529,222 +776,236 @@ body {
   </div>
 </div>
 
-<!-- ── DASHBOARD ──────────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════
+     DASHBOARD
+══════════════════════════════════════════════════ -->
 <div id="dash">
   <div class="dash-layout">
 
-    <!-- Sidebar -->
-    <aside class="sidebar">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-brand">
-        <span class="sidebar-icon">🌿</span>
+        <span class="sidebar-brand-icon">🌿</span>
         <div>
-          <div class="sidebar-name">AgroSensor</div>
-          <div class="sidebar-sub">Panel de campo</div>
+          <div class="sidebar-brand-name">Agro<span>Sensor</span></div>
+          <div class="sidebar-brand-version">fw v2.3</div>
         </div>
       </div>
 
-      <div class="sidebar-section">Dispositivo activo</div>
       <div class="sidebar-device">
-        <div class="sidebar-device-label">ID</div>
-        <div class="sidebar-device-name" id="device">—</div>
+        <div class="sidebar-device-label">Dispositivo activo</div>
+        <div class="sidebar-device-id" id="device">—</div>
       </div>
       <div class="sidebar-status">
         <span class="status-dot offline" id="sidebar-dot"></span>
-        <span id="sidebar-status-text">Offline</span>
+        <span id="sidebar-status-text" style="font-size:12px;">Offline</span>
       </div>
 
-      <div class="sidebar-section">Menú</div>
+      <div class="nav-section">Panel</div>
       <nav class="nav-menu">
         <button class="nav-item active" data-view="resumen" onclick="switchView('resumen')">
           <span class="nav-icon">📋</span> Resumen
         </button>
         <button class="nav-item" data-view="tendencia" onclick="switchView('tendencia')">
-          <span class="nav-icon">📈</span> Tendencia &amp; Historial
+          <span class="nav-icon">📈</span> Tendencia
         </button>
         <button class="nav-item" data-view="bluetooth" onclick="switchView('bluetooth')">
           <span class="nav-icon">🔵</span> Bluetooth
-          <span class="status-dot offline" id="ble-sidebar-dot" style="margin-left:auto;"></span>
+          <span class="status-dot offline" id="ble-sidebar-dot" style="margin-left:auto;flex-shrink:0;"></span>
         </button>
         <button class="nav-item" data-view="configuracion" onclick="switchView('configuracion')">
           <span class="nav-icon">⚙️</span> Configuración
         </button>
+
         <div class="nav-sub collapsed" id="config-subnav">
-          <button class="nav-sub-item active" data-subview="general" onclick="switchConfigSubview('general')">General &amp; Umbrales</button>
+          <button class="nav-sub-item active" data-subview="general" onclick="switchConfigSubview('general')">General</button>
           <button class="nav-sub-item" data-subview="planta" onclick="switchConfigSubview('planta')">🌱 Mi planta</button>
-          <button class="nav-sub-item" data-subview="logs" onclick="switchConfigSubview('logs')">Logs del ESP32</button>
+          <button class="nav-sub-item" data-subview="logs" onclick="switchConfigSubview('logs')">Logs ESP32</button>
         </div>
       </nav>
 
       <div style="flex:1"></div>
-
       <div class="sidebar-bottom">
-        <button class="btn btn-danger" style="width:100%;font-size:13px;" type="button" onclick="logout()">
-          ↩ Cerrar sesión
-        </button>
+        <button class="btn btn-danger" style="width:100%;font-size:12px;" type="button" onclick="logout()">↩ Cerrar sesión</button>
       </div>
     </aside>
 
-    <!-- Main -->
-    <main class="main">
+    <!-- MAIN -->
+    <div class="main">
+      <!-- Topbar -->
       <div class="main-topbar">
+        <button class="btn-hamburger" id="hamburger-btn" onclick="openSidebar()" aria-label="Menú">☰</button>
         <div>
-          <div class="main-title" id="main-title">Panel de monitoreo</div>
-          <div class="main-meta" id="status-meta">Esperando datos del sensor...</div>
+          <div class="topbar-title" id="main-title">Panel de monitoreo</div>
         </div>
         <div class="topbar-actions">
-          <span class="status-badge status-offline" id="status">DESCONOCIDO</span>
-          <button class="btn btn-secondary" type="button" onclick="load()">↻ Actualizar</button>
+          <span class="status-badge status-offline" id="status">OFFLINE</span>
+          <button class="btn btn-secondary btn-icon" type="button" onclick="load()" title="Actualizar">↻</button>
         </div>
       </div>
 
-      <!-- ── VIEW: RESUMEN ─────────────────────────────────── -->
-      <section class="view active" id="view-resumen">
+      <!-- Body -->
+      <div class="main-body">
 
-        <!-- Alertas según el perfil de planta -->
-        <div id="alerts-container"></div>
+        <!-- ── VIEW: RESUMEN ─────────────────────────────────── -->
+        <section class="view active" id="view-resumen">
+          <div id="alerts-container"></div>
 
-        <div class="kpi-row">
-          <div class="kpi">
-            <div class="kpi-label">⏱ Última lectura</div>
-            <div class="kpi-value" id="last-update" style="font-size:18px;">--</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-label">📡 Estado del sensor</div>
-            <div class="kpi-value" id="sensor-status">--</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-label">⏲ Frecuencia de medición</div>
-            <div class="kpi-value" id="kpi-interval" style="font-size:18px;">--</div>
-          </div>
-        </div>
-
-        <div class="section-header">
-          <span class="section-title">Lecturas actuales</span>
-        </div>
-        <div id="grid"></div>
-      </section>
-
-      <!-- ── VIEW: TENDENCIA & HISTORIAL ──────────────────────── -->
-      <section class="view" id="view-tendencia">
-        <div class="chart-card">
-          <div class="chart-card-header">
-            <div class="chart-title">Tendencia histórica</div>
-            <div class="chart-legend">
-              <div class="legend-item"><span class="legend-dot" style="background:#f4a261"></span>Temperatura</div>
-              <div class="legend-item"><span class="legend-dot" style="background:#90e0ef"></span>Humedad aire</div>
-              <div class="legend-item"><span class="legend-dot" style="background:#40916c"></span>Humedad tierra</div>
+          <div class="kpi-row">
+            <div class="kpi">
+              <div class="kpi-label">⏱ Última lectura</div>
+              <div class="kpi-value" id="last-update" style="font-size:16px;letter-spacing:-0.01em;">--</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">📡 Estado sensor</div>
+              <div class="kpi-value" id="sensor-status" style="font-size:16px;">--</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">⏲ Frecuencia</div>
+              <div class="kpi-value" id="kpi-interval">--</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">📶 RSSI</div>
+              <div class="kpi-value" id="kpi-rssi">--</div>
             </div>
           </div>
-          <div class="chart-range-bar" style="margin-bottom:16px;">
-            <button class="range-btn" data-range="3">3h</button>
-            <button class="range-btn" data-range="12">12h</button>
-            <button class="range-btn active" data-range="24">24h</button>
-            <button class="range-btn" data-range="72">3 días</button>
-            <button class="range-btn" data-range="0">Todo</button>
-          </div>
-          <div class="chart-wrap">
-            <canvas id="trend-chart"></canvas>
-          </div>
-        </div>
 
-        <div class="history-card">
-          <div class="chart-card-header">
-            <div class="chart-title">Historial de lecturas</div>
-            <span id="history-source" style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;"></span>
+          <div class="section-header">
+            <span class="section-title">Lecturas actuales</span>
+            <span id="status-meta" style="font-size:12px;color:var(--text-dim);">Esperando datos...</span>
+          </div>
+          <div id="grid"></div>
+        </section>
+
+        <!-- ── VIEW: TENDENCIA ───────────────────────────────── -->
+        <section class="view" id="view-tendencia">
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+              <div class="card-title">Tendencia histórica</div>
+              <div class="chart-legend">
+                <div class="legend-item"><span class="legend-dot" style="background:#fbbf24"></span>Temperatura</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#67e8f9"></span>Humedad aire</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#4ade80"></span>Humedad tierra</div>
+              </div>
+            </div>
+            <div class="chart-range-bar">
+              <button class="range-btn" data-range="3">3h</button>
+              <button class="range-btn" data-range="12">12h</button>
+              <button class="range-btn active" data-range="24">24h</button>
+              <button class="range-btn" data-range="72">3d</button>
+              <button class="range-btn" data-range="0">Todo</button>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="trend-chart"></canvas>
+            </div>
           </div>
 
-          <div class="history-filters">
-            <select id="history-filter" class="filter-select">
-              <option value="all">Todo el historial</option>
-              <option value="last3">Últimas 3 horas</option>
-              <option value="today">Hoy</option>
-              <option value="custom">Rango personalizado</option>
-            </select>
-            <input id="filter-date" type="date" class="filter-input" style="display:none;" />
-            <input id="filter-from" type="time" class="filter-input" style="display:none;" />
-            <input id="filter-to"   type="time" class="filter-input" style="display:none;" />
-            <button id="filter-apply" class="btn btn-secondary">Aplicar</button>
-            <button id="filter-reset" class="btn btn-secondary">Restablecer</button>
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+              <div class="card-title">Historial de lecturas</div>
+              <span id="history-source" style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;"></span>
+            </div>
+
+            <div class="history-filters">
+              <select id="history-filter" class="filter-select">
+                <option value="all">Todo el historial</option>
+                <option value="last3">Últimas 3 horas</option>
+                <option value="today">Hoy</option>
+                <option value="custom">Rango personalizado</option>
+              </select>
+              <input id="filter-date" type="date" class="filter-input" style="display:none;" />
+              <input id="filter-from" type="time" class="filter-input" style="display:none;" />
+              <input id="filter-to"   type="time" class="filter-input" style="display:none;" />
+              <button id="filter-apply" class="btn btn-secondary">Aplicar</button>
+              <button id="filter-reset" class="btn btn-secondary">Limpiar</button>
+            </div>
+
+            <div class="history-table-wrap">
+              <table id="history-table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Hora</th>
+                    <th>🌱 Tierra %</th>
+                    <th>☀️ Temp °C</th>
+                    <th>☁️ Humedad %</th>
+                  </tr>
+                </thead>
+                <tbody id="history-tbody"></tbody>
+              </table>
+            </div>
           </div>
+        </section>
 
-          <div class="history-table-wrap">
-            <table id="history-table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Hora</th>
-                  <th>🌱 Tierra</th>
-                  <th>☀️ Temperatura</th>
-                  <th>☁️ Humedad aire</th>
-                </tr>
-              </thead>
-              <tbody id="history-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+        <!-- ── VIEW: BLUETOOTH ───────────────────────────────── -->
+        <section class="view" id="view-bluetooth">
 
-      <!-- ── VIEW: BLUETOOTH ───────────────────────────────── -->
-      <section class="view" id="view-bluetooth">
-        <div class="settings-card">
-          <div class="settings-card-title">Bluetooth local</div>
-          <div class="settings-card-desc">Conecta directo con el ESP32 cuando quieras revisar lecturas, estado y logs sin depender del servidor.</div>
-
-          <div class="ble-status-line">
-            <span class="status-dot offline" id="ble-dot"></span>
-            <span id="ble-dot-text">Desconectado</span>
+          <!-- Header de estado BLE -->
+          <div class="ble-header">
+            <div class="ble-dot-wrap">
+              <span class="status-dot offline" id="ble-dot"></span>
+              <span id="ble-dot-text" style="font-size:13px;font-weight:600;color:var(--text);">Desconectado</span>
+            </div>
+            <span class="ble-device-name" id="ble-device-name"></span>
             <span id="ble-conn-status" class="ble-status-info">Listo para conectar.</span>
           </div>
 
+          <!-- Acciones BLE -->
           <div class="ble-actions">
-            <button class="btn btn-primary" style="width:auto;" id="ble-connect-btn" type="button">Conectar</button>
+            <button class="btn btn-primary" style="width:auto;" id="ble-connect-btn" type="button">🔵 Conectar por Bluetooth</button>
             <button class="btn btn-danger" style="display:none;" id="ble-disconnect-btn" type="button">Desconectar</button>
-            <button class="btn btn-secondary" id="ble-refresh-btn" type="button">Actualizar</button>
+            <button class="btn btn-secondary" id="ble-refresh-btn" type="button">↻ Leer ahora</button>
+            <div class="ble-heartbeat" id="ble-heartbeat" style="display:none;">
+              <span class="ble-heartbeat-pulse" id="ble-hb-pulse"></span>
+              <span id="ble-hb-ts">--</span>
+            </div>
           </div>
 
-          <div id="ble-data-panels" style="display:none;">
-            <div class="section-header">
-              <span class="section-title">Lectura por Bluetooth</span>
-              <span id="ble-last-update" style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;">--</span>
+          <!-- Panel de datos (oculto hasta conectar) -->
+          <div id="ble-data-panels">
+
+            <div class="card">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div class="card-title">Telemetría por Bluetooth</div>
+                <span id="ble-last-update" style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;">--</span>
+              </div>
+              <div class="ble-grid">
+                <div class="ble-metric">
+                  <div class="ble-metric-label">Temperatura</div>
+                  <div class="ble-metric-value live" id="ble-temp">--</div>
+                </div>
+                <div class="ble-metric">
+                  <div class="ble-metric-label">Humedad aire</div>
+                  <div class="ble-metric-value live" id="ble-hum-aire">--</div>
+                </div>
+                <div class="ble-metric">
+                  <div class="ble-metric-label">Humedad suelo</div>
+                  <div class="ble-metric-value live" id="ble-hum-suelo">--</div>
+                </div>
+                <div class="ble-metric">
+                  <div class="ble-metric-label">Suelo bruto ADC</div>
+                  <div class="ble-metric-value" id="ble-soil-raw">--</div>
+                </div>
+                <div class="ble-metric">
+                  <div class="ble-metric-label">RSSI WiFi</div>
+                  <div class="ble-metric-value" id="ble-rssi">--</div>
+                </div>
+                <div class="ble-metric">
+                  <div class="ble-metric-label">Intervalo</div>
+                  <div class="ble-metric-value" id="ble-interval">--</div>
+                </div>
+                <div class="ble-metric" style="grid-column: span 2;">
+                  <div class="ble-metric-label">Timestamp ESP32</div>
+                  <div class="ble-metric-value" id="ble-ts" style="font-size:13px;">--</div>
+                </div>
+              </div>
             </div>
 
-            <div class="ble-grid">
-              <div class="ble-metric">
-                <div class="ble-metric-label">Temperatura</div>
-                <div class="ble-metric-value" id="ble-temp">--</div>
-              </div>
-              <div class="ble-metric">
-                <div class="ble-metric-label">Humedad aire</div>
-                <div class="ble-metric-value" id="ble-hum-aire">--</div>
-              </div>
-              <div class="ble-metric">
-                <div class="ble-metric-label">Humedad suelo</div>
-                <div class="ble-metric-value" id="ble-hum-suelo">--</div>
-              </div>
-              <div class="ble-metric">
-                <div class="ble-metric-label">Suelo bruto</div>
-                <div class="ble-metric-value" id="ble-soil-raw">--</div>
-              </div>
-              <div class="ble-metric">
-                <div class="ble-metric-label">RSSI</div>
-                <div class="ble-metric-value" id="ble-rssi">--</div>
-              </div>
-              <div class="ble-metric">
-                <div class="ble-metric-label">Intervalo</div>
-                <div class="ble-metric-value" id="ble-interval">--</div>
-              </div>
-              <div class="ble-metric">
-                <div class="ble-metric-label">Timestamp ESP32</div>
-                <div class="ble-metric-value" id="ble-ts">--</div>
-              </div>
-            </div>
-
-            <div class="settings-card" style="box-shadow:none;margin-bottom:18px;">
-              <div class="settings-card-title">Estado del dispositivo</div>
-              <div class="settings-card-desc">Diagnóstico reportado por el firmware vía Bluetooth.</div>
+            <!-- Estado del firmware -->
+            <div class="card">
+              <div class="card-title" style="margin-bottom:14px;">Estado del firmware</div>
               <div class="ble-status-grid">
                 <div class="ble-status-item"><span>WiFi</span><span id="ble-st-wifi">--</span></div>
-                <div class="ble-status-item"><span>Badge WiFi</span><span id="ble-st-wifi-badge" class="status-badge status-offline">--</span></div>
                 <div class="ble-status-item"><span>MQTT</span><span id="ble-st-mqtt">--</span></div>
                 <div class="ble-status-item"><span>RSSI WiFi</span><span id="ble-st-rssi">--</span></div>
                 <div class="ble-status-item"><span>Intentos WiFi</span><span id="ble-st-intentos">--</span></div>
@@ -753,12 +1014,17 @@ body {
                 <div class="ble-status-item"><span>Zona horaria</span><span id="ble-st-tz">--</span></div>
                 <div class="ble-status-item"><span>MAC</span><span id="ble-st-mac">--</span></div>
                 <div class="ble-status-item"><span>Device ID</span><span id="ble-st-device">--</span></div>
-                <div class="ble-status-item"><span>Intervalo firmware</span><span id="ble-st-interval">--</span></div>
+                <div class="ble-status-item"><span>Intervalo fw</span><span id="ble-st-interval">--</span></div>
+              </div>
+              <div style="margin-top:10px;">
+                <span id="ble-st-wifi-badge" class="status-badge status-offline">--</span>
               </div>
             </div>
 
-            <div class="settings-card" style="box-shadow:none;margin-bottom:18px;">
-              <div class="settings-card-title">Frecuencia por Bluetooth</div>
+            <!-- Configurar intervalo por BLE -->
+            <div class="card">
+              <div class="card-title">Cambiar frecuencia por Bluetooth</div>
+              <div class="card-desc">Escribe directamente en el ESP32 sin necesitar servidor.</div>
               <div class="settings-row">
                 <div class="settings-field">
                   <label for="ble-cfg-interval-value">Intervalo</label>
@@ -780,187 +1046,176 @@ body {
               <div class="settings-status" id="ble-cfg-status"></div>
             </div>
 
-            <div class="settings-card" style="box-shadow:none;margin-bottom:0;">
-              <div class="settings-card-title">Log WiFi por Bluetooth</div>
+            <!-- Log WiFi vía BLE -->
+            <div class="card" style="margin-bottom:0;">
+              <div class="card-title" style="margin-bottom:12px;">Log WiFi por Bluetooth</div>
+              <div class="log-toolbar">
+                <button class="btn btn-secondary" onclick="bleReadWifiLog()" style="font-size:12px;">↻ Actualizar log</button>
+              </div>
               <div class="log-console" id="ble-log-console">
                 <div class="log-empty">Conecta el dispositivo para ver el log WiFi.</div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- ── VIEW: CONFIGURACIÓN ──────────────────────────────── -->
-      <section class="view" id="view-configuracion">
+        <!-- ── VIEW: CONFIGURACIÓN ───────────────────────────── -->
+        <section class="view" id="view-configuracion">
 
-        <!-- Sub-panel: General & Umbrales -->
-        <div class="settings-panel active" id="config-general">
-
-          <div class="settings-card">
-            <div class="settings-card-title">Frecuencia de medición</div>
-            <div class="settings-card-desc">Define cada cuánto tiempo el ESP32 toma y envía lecturas al servidor.</div>
-            <div class="settings-row">
-              <div class="settings-field">
-                <label for="cfg-interval-value">Intervalo</label>
-                <input id="cfg-interval-value" type="number" min="1" step="1" placeholder="Ej: 5">
-              </div>
-              <div class="settings-field">
-                <label for="cfg-interval-unit">Unidad</label>
-                <select id="cfg-interval-unit">
-                  <option value="seconds">Segundos</option>
-                  <option value="minutes" selected>Minutos</option>
-                  <option value="hours">Horas</option>
-                </select>
-              </div>
-              <div class="settings-field" style="flex:0 0 auto;">
-                <label>&nbsp;</label>
-                <button class="btn btn-primary" style="width:auto;" id="cfg-interval-save" onclick="saveMeasurementInterval()">Guardar</button>
-              </div>
-            </div>
-            <div class="form-hint">El cambio se aplica en la próxima sincronización del dispositivo (puede tardar hasta un ciclo en aplicarse).</div>
-            <div class="settings-status" id="cfg-interval-status"></div>
-          </div>
-
-          
-
-          <div class="settings-card">
-            <div class="settings-card-title">Refresco del panel</div>
-            <div class="settings-card-desc">Cada cuánto tiempo este dashboard consulta al servidor para refrescar la pantalla (no afecta al ESP32).</div>
-            <div class="settings-row">
-              <div class="settings-field" style="max-width:220px;">
-                <label for="cfg-dashboard-refresh">Refrescar cada</label>
-                <select id="cfg-dashboard-refresh" onchange="onDashboardRefreshChange()">
-                  <option value="15000">15 segundos</option>
-                  <option value="30000" selected>30 segundos</option>
-                  <option value="60000">1 minuto</option>
-                  <option value="300000">5 minutos</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Sub-panel: Mi planta -->
-        <div class="settings-panel" id="config-planta">
-
-          <div class="settings-card">
-            <div class="settings-card-title">🔔 Notificaciones</div>
-            <div class="settings-card-desc">Recibe avisos cuando la temperatura o la humedad salgan del rango ideal de tu planta (por ejemplo, cuando necesite riego).</div>
-            <div class="settings-row" style="align-items:center;">
-              <div class="settings-field" style="flex:2; min-width:220px;">
-                <span id="notif-status" style="font-size:13px; color:var(--muted);">Verificando soporte de notificaciones...</span>
-              </div>
-              <div class="settings-field" style="flex:0 0 auto;">
-                <button class="btn btn-primary" style="width:auto; display:none;" id="notif-enable-btn">Activar notificaciones</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-card">
-            <div class="settings-card-title">¿Qué planta tiene tu sensor?</div>
-            <div class="settings-card-desc">Selecciona la planta monitoreada (o define un perfil personalizado). Las alertas de temperatura y humedad se calcularán según estos rangos.</div>
-
-            <div class="settings-row">
-              <div class="settings-field">
-                <label for="plant-name">Nombre / ubicación (opcional)</label>
-                <input id="plant-name" type="text" placeholder="Ej: Cactus del balcón">
-              </div>
-              <div class="settings-field">
-                <label for="plant-preset">Planta</label>
-                <select id="plant-preset">
-                  <option value="cactus">🌵 Cactus</option>
-                  <option value="ruda_templada">🌿 Ruda (clima templado)</option>
-                  <option value="ruda_calida">🌿 Ruda (clima cálido)</option>
-                  <option value="custom">⚙️ Personalizado</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="plant-info-box" id="plant-info-box"></div>
-
-            <div id="plant-custom-fields" style="display:none; margin-top:18px;">
-              <div class="threshold-grid">
-                <div class="threshold-item">
-                  <div class="threshold-item-title">☀️ Temperatura (°C)</div>
-                  <div class="threshold-range">
-                    <input id="plant-custom-temp-min" type="number" step="0.5" placeholder="Mín">
-                    <span>—</span>
-                    <input id="plant-custom-temp-max" type="number" step="0.5" placeholder="Máx">
-                  </div>
+          <!-- Config: General -->
+          <div class="settings-panel active" id="config-general">
+            <div class="card">
+              <div class="card-title">Frecuencia de medición</div>
+              <div class="card-desc">Define cada cuánto el ESP32 toma lecturas y las envía al servidor.</div>
+              <div class="settings-row">
+                <div class="settings-field">
+                  <label for="cfg-interval-value">Intervalo</label>
+                  <input id="cfg-interval-value" type="number" min="1" step="1" placeholder="Ej: 5">
                 </div>
-                <div class="threshold-item">
-                  <div class="threshold-item-title">☁️ Humedad ambiente (%)</div>
-                  <div class="threshold-range">
-                    <input id="plant-custom-aire-min" type="number" step="1" min="0" max="100" placeholder="Mín">
-                    <span>—</span>
-                    <input id="plant-custom-aire-max" type="number" step="1" min="0" max="100" placeholder="Máx">
-                  </div>
+                <div class="settings-field">
+                  <label for="cfg-interval-unit">Unidad</label>
+                  <select id="cfg-interval-unit">
+                    <option value="seconds">Segundos</option>
+                    <option value="minutes" selected>Minutos</option>
+                    <option value="hours">Horas</option>
+                  </select>
                 </div>
-                <div class="threshold-item">
-                  <div class="threshold-item-title">🌱 Humedad de sustrato (%)</div>
-                  <div class="threshold-range">
-                    <input id="plant-custom-tierra-min" type="number" step="1" min="0" max="100" placeholder="Mín">
-                    <span>—</span>
-                    <input id="plant-custom-tierra-max" type="number" step="1" min="0" max="100" placeholder="Máx">
-                  </div>
+                <div class="settings-field" style="flex:0 0 auto;">
+                  <label>&nbsp;</label>
+                  <button class="btn btn-primary" style="width:auto;" onclick="saveMeasurementInterval()">Guardar</button>
+                </div>
+              </div>
+              <div class="form-hint">El cambio se aplica en el próximo ciclo del firmware.</div>
+              <div class="settings-status" id="cfg-interval-status"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">Refresco del dashboard</div>
+              <div class="card-desc">Cada cuánto este panel consulta al servidor (no afecta al ESP32).</div>
+              <div class="settings-row">
+                <div class="settings-field" style="max-width:220px;">
+                  <label for="cfg-dashboard-refresh">Intervalo</label>
+                  <select id="cfg-dashboard-refresh" onchange="onDashboardRefreshChange()">
+                    <option value="15000">15 segundos</option>
+                    <option value="30000" selected>30 segundos</option>
+                    <option value="60000">1 minuto</option>
+                    <option value="300000">5 minutos</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Config: Mi planta -->
+          <div class="settings-panel" id="config-planta">
+            <div class="card">
+              <div class="card-title">🔔 Notificaciones push</div>
+              <div class="card-desc">Recibe alertas cuando la planta esté fuera del rango ideal.</div>
+              <div class="settings-row" style="align-items:center;">
+                <div class="settings-field" style="flex:2;">
+                  <span id="notif-status" style="font-size:13px;color:var(--text-dim);">Verificando soporte...</span>
+                </div>
+                <div class="settings-field" style="flex:0 0 auto;">
+                  <button class="btn btn-primary" style="width:auto;display:none;" id="notif-enable-btn">Activar notificaciones</button>
                 </div>
               </div>
             </div>
 
-            <div class="settings-row" style="margin-top:18px;">
-              <div class="settings-field" style="flex:0 0 auto;">
-                <button class="btn btn-primary" style="width:auto;" onclick="savePlantProfileFromUI()">Guardar perfil de planta</button>
+            <div class="card">
+              <div class="card-title">Perfil de planta</div>
+              <div class="card-desc">Las alertas de temperatura y humedad se calculan según estos rangos.</div>
+              <div class="settings-row">
+                <div class="settings-field">
+                  <label for="plant-name">Nombre / ubicación (opcional)</label>
+                  <input id="plant-name" type="text" placeholder="Ej: Cactus del balcón">
+                </div>
+                <div class="settings-field">
+                  <label for="plant-preset">Planta</label>
+                  <select id="plant-preset">
+                    <option value="cactus">🌵 Cactus</option>
+                    <option value="ruda_templada">🌿 Ruda</option>
+                    <option value="Filodendro">🌿 Filodendro</option>
+                    <option value="custom">⚙️ Personalizado</option>
+                  </select>
+                </div>
+              </div>
+              <div class="plant-info-box" id="plant-info-box"></div>
+              <div id="plant-custom-fields" style="display:none;margin-top:16px;">
+                <div class="threshold-grid">
+                  <div class="threshold-item">
+                    <div class="threshold-item-title">☀️ Temperatura (°C)</div>
+                    <div class="threshold-range">
+                      <input id="plant-custom-temp-min" type="number" step="0.5" placeholder="Mín">
+                      <span>—</span>
+                      <input id="plant-custom-temp-max" type="number" step="0.5" placeholder="Máx">
+                    </div>
+                  </div>
+                  <div class="threshold-item">
+                    <div class="threshold-item-title">☁️ Humedad ambiente (%)</div>
+                    <div class="threshold-range">
+                      <input id="plant-custom-aire-min" type="number" step="1" min="0" max="100" placeholder="Mín">
+                      <span>—</span>
+                      <input id="plant-custom-aire-max" type="number" step="1" min="0" max="100" placeholder="Máx">
+                    </div>
+                  </div>
+                  <div class="threshold-item">
+                    <div class="threshold-item-title">🌱 Humedad sustrato (%)</div>
+                    <div class="threshold-range">
+                      <input id="plant-custom-tierra-min" type="number" step="1" min="0" max="100" placeholder="Mín">
+                      <span>—</span>
+                      <input id="plant-custom-tierra-max" type="number" step="1" min="0" max="100" placeholder="Máx">
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top:16px;">
+                <button class="btn btn-primary" style="width:auto;" onclick="savePlantProfileFromUI()">Guardar perfil</button>
+              </div>
+              <div class="settings-status" id="cfg-plant-status"></div>
+            </div>
+          </div>
+
+          <!-- Config: Logs -->
+          <div class="settings-panel" id="config-logs">
+            <div class="card">
+              <div class="card-title">Logs del dispositivo</div>
+              <div class="card-desc">Eventos recientes del ESP32: conexiones, errores y envíos.</div>
+              <div class="log-toolbar">
+                <button class="btn btn-secondary" onclick="loadDeviceLogs()">↻ Actualizar</button>
+                <label class="auto-scroll-toggle">
+                  <input type="checkbox" id="log-autoscroll" checked>
+                  Auto-scroll
+                </label>
+                <span id="log-status" style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;"></span>
+              </div>
+              <div class="log-console" id="log-console">
+                <div class="log-empty">Sin logs cargados. Presiona "Actualizar".</div>
               </div>
             </div>
-            <div class="settings-status" id="cfg-plant-status"></div>
           </div>
-        </div>
 
-        <!-- Sub-panel: Logs -->
-        <div class="settings-panel" id="config-logs">
-          <div class="settings-card">
-            <div class="settings-card-title">Logs del dispositivo</div>
-            <div class="settings-card-desc">Eventos recientes del ESP32: conexiones, desconexiones, errores de sensor y envíos al servidor.</div>
+        </section>
 
-            <div class="log-toolbar">
-              <button class="btn btn-secondary" onclick="loadDeviceLogs()">↻ Actualizar logs</button>
-              <label class="auto-scroll-toggle">
-                <input type="checkbox" id="log-autoscroll" checked>
-                Auto-scroll
-              </label>
-              <span id="log-status" style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;"></span>
-            </div>
+      </div><!-- /main-body -->
+    </div><!-- /main -->
+  </div><!-- /dash-layout -->
+</div><!-- /dash -->
 
-            <div class="log-console" id="log-console">
-              <div class="log-empty">Sin logs cargados todavía. Presiona "Actualizar logs".</div>
-            </div>
-          </div>
-        </div>
-
-      </section>
-
-    </main>
-  </div>
-</div>
-
-<!-- ── PWA INSTALL MODAL ──────────────────────────────────── -->
+<!-- PWA INSTALL MODAL -->
 <div id="pwa-install-modal">
   <div class="pwa-modal-card">
     <div class="pwa-modal-header">
       <span class="pwa-modal-icon">🌿</span>
       <div>
         <div class="pwa-modal-title">Instala AgroSensor</div>
-        <div class="pwa-modal-sub">Agrégala a tu pantalla de inicio para un acceso más rápido</div>
+        <div class="pwa-modal-sub">Acceso directo desde tu pantalla de inicio</div>
       </div>
     </div>
     <div class="pwa-modal-body">
-      <div id="pwa-android-instructions">
-        Instala esta app en tu teléfono para acceder directamente desde tu pantalla principal, sin abrir el navegador.
-      </div>
+      <div id="pwa-android-instructions">Instala esta app en tu teléfono para acceder sin abrir el navegador.</div>
       <div id="pwa-ios-instructions" style="display:none;">
-        Para instalarla en iPhone/iPad:
-        <ol>
-          <li>Toca el botón <strong>Compartir</strong> (el cuadro con la flecha hacia arriba) en la barra de Safari.</li>
+        Para instalar en iPhone/iPad:<ol>
+          <li>Toca el botón <strong>Compartir</strong> (cuadro con flecha ↑) en Safari.</li>
           <li>Selecciona <strong>"Agregar a pantalla de inicio"</strong>.</li>
           <li>Confirma tocando <strong>"Agregar"</strong>.</li>
         </ol>
@@ -968,8 +1223,8 @@ body {
     </div>
     <div class="pwa-modal-actions">
       <button class="btn btn-secondary" id="pwa-later-btn" type="button">Más tarde</button>
-      <button class="btn btn-primary" id="pwa-install-btn" type="button" style="display:none;">Instalar</button>
-      <button class="btn btn-primary" id="pwa-dismiss-btn" type="button">Entendido</button>
+      <button class="btn btn-primary"   id="pwa-install-btn" type="button" style="display:none;">Instalar</button>
+      <button class="btn btn-primary"   id="pwa-dismiss-btn" type="button">Entendido</button>
     </div>
   </div>
 </div>
