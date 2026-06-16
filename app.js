@@ -1911,17 +1911,6 @@ async function bleReadWifiLog() {
   catch (e) { console.warn('[BLE] Error leyendo WiFi log:', e); }
 }
 
-async function bleReadHeartbeat() {
-  if (!BLE_STATE.charHeartbeat) return;
-  try { bleHandleHeartbeat(await BLE_STATE.charHeartbeat.readValue()); }
-  catch (e) { console.warn('[BLE] Error leyendo heartbeat:', e); }
-}
-
-// ── Handlers de datos entrantes ───────────────────────────────────────────────
-
-function bleHandleHeartbeat(dataValue) {
-  bleMarkHeartbeat('BLE', bleParseJsonValue(dataValue, {}));
-}
 
 function bleHandleTelemetry(dataValue) {
   const data = bleParseJsonValue(dataValue, null);
@@ -2036,6 +2025,17 @@ async function bleSaveInterval() {
 }
 
 // ── CONEXIÓN PRINCIPAL ────────────────────────────────────────────────────────
+async function bleReadHeartbeat() {
+  if (!BLE_STATE.charHeartbeat) return;
+  try { bleHandleHeartbeat(await BLE_STATE.charHeartbeat.readValue()); }
+  catch (e) { console.warn('[BLE] Error leyendo heartbeat:', e); }
+}
+
+// ── Handlers de datos entrantes ───────────────────────────────────────────────
+
+function bleHandleHeartbeat(dataValue) {
+  bleMarkHeartbeat('BLE', bleParseJsonValue(dataValue, {}));
+}
 
 async function bleConnect() {
   if (!bleSupported()) {
@@ -2191,9 +2191,7 @@ function setupBleUI() {
   document.getElementById('ble-cfg-save')?.addEventListener('click', () => bleSaveInterval());
   bleUpdateConnectedUI(false);
 }
-// ─────────────────────────────────────────────────────────────
-// SIDEBAR MOBILE
-// ─────────────────────────────────────────────────────────────
+
 
 function openSidebar() {
   const sidebar = document.getElementById('sidebar');
